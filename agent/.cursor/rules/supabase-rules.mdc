@@ -1,0 +1,10 @@
+---
+description: A file containing best practices, resource reference & suggestions.
+globs: .py
+alwaysApply: true
+---
+## for supabase use
+Refer to  the following documentation https://supabase.com/docs/reference/python/ for supabase operations
+
+## General rule
+code should be modular and come with neccessary coding comments to explain implementation as needed.

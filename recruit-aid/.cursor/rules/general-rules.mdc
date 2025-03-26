@@ -1,0 +1,17 @@
+---
+description: Guidelines for designing the UX and UI of the application
+globs: "**/*.ts, **/*.tsx, **/*.js, **/*.jsx"
+alwaysApply: false
+---
+#UI design specifications
+As an AI model you must always provide:
+1. responsive code
+2. accessible code
+3. SEO rich code
+
+#UX design specifications
+Provide subtle animations to engage user
+
+#Absolute must when using shadcn
+The right command to install shadcn with is 
+"npx shadcn@latest init"
