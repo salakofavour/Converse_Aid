@@ -1,6 +1,6 @@
 'use client';
 
-import { getJobById } from '@/lib/supabase';
+import { getApplicants, getJobById } from '@/lib/supabase';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -11,6 +11,8 @@ export default function JobDetail() {
   const [job, setJob] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [applicants, setApplicants] = useState([]);
+  const [isLoadingApplicants, setIsLoadingApplicants] = useState(true);
   
   // Load job data from Supabase
   useEffect(() => {
@@ -43,6 +45,30 @@ export default function JobDetail() {
     }
     
     loadJob();
+  }, [params.id]);
+  
+  // Load applicants
+  useEffect(() => {
+    async function loadApplicants() {
+      if (!params.id) return;
+      
+      try {
+        setIsLoadingApplicants(true);
+        const { applicants: applicantsData, error } = await getApplicants(params.id);
+        
+        if (error) {
+          console.error('Error loading applicants:', error);
+        } else {
+          setApplicants(applicantsData || []);
+        }
+      } catch (err) {
+        console.error('Error loading applicants:', err);
+      } finally {
+        setIsLoadingApplicants(false);
+      }
+    }
+    
+    loadApplicants();
   }, [params.id]);
   
   // Format date for display
@@ -218,15 +244,15 @@ export default function JobDetail() {
               </div>
             )}
             
-            {job.requirements && (
+            {job.qualifications && (
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Requirements</h3>
+                <h3 className="text-sm font-medium text-gray-500 mb-2">qualifications</h3>
                 <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
-                  {formatBulletPoints(job.requirements).slice(0, 3).map((point, index) => (
+                  {formatBulletPoints(job.qualifications).slice(0, 3).map((point, index) => (
                     <li key={index}>{point}</li>
                   ))}
-                  {formatBulletPoints(job.requirements).length > 3 && (
-                    <li className="text-primary">+ {formatBulletPoints(job.requirements).length - 3} more</li>
+                  {formatBulletPoints(job.qualifications).length > 3 && (
+                    <li className="text-primary">+ {formatBulletPoints(job.qualifications).length - 3} more</li>
                   )}
                 </ul>
               </div>
@@ -237,9 +263,13 @@ export default function JobDetail() {
       
       {/* Applicants Table */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <h2 className="text-lg font-semibold mb-4">Applicants ({job.applicants?.length || 0})</h2>
+        <h2 className="text-lg font-semibold mb-4">Applicants ({applicants.length})</h2>
         
-        {(!job.applicants || job.applicants.length === 0) ? (
+        {isLoadingApplicants ? (
+          <div className="text-center py-4">
+            <div className="animate-pulse">Loading applicants...</div>
+          </div>
+        ) : applicants.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-gray-500">No applicants yet</p>
           </div>
@@ -260,13 +290,17 @@ export default function JobDetail() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {job.applicants.map((applicant, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
+                {applicants.map((applicant) => (
+                  <tr key={applicant.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{applicant.name}</div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {applicant.name_email.name}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">{applicant.email}</div>
+                      <div className="text-sm text-gray-500">
+                        {applicant.name_email.email}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button className="text-primary hover:text-primary-dark transition-colors">

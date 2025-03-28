@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+
 export default function JobSummary() {
   const router = useRouter();
   const [jobData, setJobData] = useState(null);
@@ -77,8 +78,7 @@ export default function JobSummary() {
         flow_start_date: jobData.flowStartDate,
         flow_end_date: jobData.flowEndDate,
         responsibilities: jobData.responsibilities,
-        requirements: jobData.requirements,
-        applicants: jobData.applicants,
+        qualifications: jobData.qualifications,
         Job_email: jobData.senderEmail,
         status: status,
         status_manually_set: false
@@ -93,7 +93,6 @@ export default function JobSummary() {
       
       // Clear localStorage
       localStorage.removeItem('jobFormData');
-      localStorage.removeItem('applicants');
       
       // Navigate to view-jobs page
       router.push('/dashboard/view-jobs');
@@ -239,34 +238,13 @@ export default function JobSummary() {
           </div>
           
           <div className="border-b border-gray-200 pb-6">
-            <h2 className="text-xl font-semibold mb-4">Requirements</h2>
+            <h2 className="text-xl font-semibold mb-4">qualifications</h2>
             <ul className="list-disc pl-5 space-y-2 text-gray-700">
-              {formatBulletPoints(jobData.requirements).map((point, index) => (
+              {formatBulletPoints(jobData.qualifications).map((point, index) => (
                 <li key={index}>{point}</li>
               ))}
             </ul>
           </div>
-          
-          {jobData.applicants && jobData.applicants.length > 0 && (
-            <div className="border-b border-gray-200 pb-6">
-              <h2 className="text-xl font-semibold mb-4">Applicants ({jobData.applicants.length})</h2>
-              <div className="max-h-60 overflow-y-auto">
-                <ul className="space-y-2">
-                  {jobData.applicants.map((applicant, index) => (
-                    <li 
-                      key={index} 
-                      className="flex items-center justify-between bg-gray-50 p-3 rounded"
-                    >
-                      <div>
-                        <span className="font-medium">{applicant.name}</span>
-                        <span className="text-gray-500 ml-2">({applicant.email})</span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
           
           <div className="flex justify-end space-x-4 pt-4">
             <Link

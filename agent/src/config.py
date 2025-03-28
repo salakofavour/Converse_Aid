@@ -29,7 +29,7 @@ DEFAULT_RECEIVER = "salakofavour0@gmail.com"
 DEFAULT_SENDER = "favoursalako041@gmail.com"
 
 # For testing/development
-DEFAULT_JOB_ID = "f97535bd-7939-4dfc-bfd4-a063c38bd95d"
+DEFAULT_JOB_ID = "2c8921d2-2f79-434d-a456-d249d35acf20"
 
 # LLM settings
 LLM_MODEL = "llama-3.3-70b-versatile"

@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS "jobs" (
   flow_start_date DATE NOT NULL,
   flow_end_date DATE NOT NULL,
   responsibilities TEXT,
-  requirements TEXT,
+  qualifications TEXT,
   applicants JSONB DEFAULT '[]'::jsonb,
   status TEXT NOT NULL DEFAULT 'active',
   status_manually_set BOOLEAN DEFAULT false,

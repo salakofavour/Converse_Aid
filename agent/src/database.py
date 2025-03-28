@@ -100,8 +100,8 @@ class DatabaseService:
             access_expires_in = next((value.get('access_expires_in') for value in values 
                                     if value.get('email') == email), None)
             
-            if not access_token or not refresh_token:
-                raise ValueError(f"Missing tokens for email: {email}")
+            if not refresh_token:
+                raise ValueError(f"Missing refresh tokens for email: {email}")
             
             return {
                 "access_token": access_token,
@@ -200,6 +200,7 @@ class DatabaseService:
             return True
         except Exception as e:
             raise
+
     
     @retry_with_backoff()
     def update_response(self, job_id: str, response: str) -> bool:

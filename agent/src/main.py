@@ -1,5 +1,6 @@
 import os
 import time
+import asyncio
 from typing import Dict, Any, Optional, List, Annotated
 from langchain_core.prompts import PromptTemplate
 from langchain_groq import ChatGroq
@@ -70,6 +71,10 @@ class EmailAutomationApp:
             
             # Define chatbot function
             def chatbot(state: State):
+                 # Check if we've completed our sequence
+                if "sequence_complete" in state and state["sequence_complete"]:
+                    return {"messages": [], "sequence_complete": True}
+                
                 result = llm_with_tools.invoke(state["messages"])
                 return {"messages": [result]}
             
@@ -79,8 +84,16 @@ class EmailAutomationApp:
             
             tool_node = ToolNode(tools)
             graph_builder.add_node("tools", tool_node)
+
+            # Add condition to check if sequence is complete -> honestly i dont fully understand this part of the code. 
+            # I know the tools_condition is a prebuilt tooll and get how it works, and i understand that the sequence condition 
+            #  function is more or less checking to see if the output is complet but i still dont fully understand it
+            def sequence_condition(output): #tools condition
+                if "sequence_complete" in output and output["sequence_complete"]: #because the output will not return only "sequence_complete" we first check if it exist in it first
+                    return END
+                return tools_condition(output)
             
-            graph_builder.add_conditional_edges("chatbot", tools_condition)
+            graph_builder.add_conditional_edges("chatbot", sequence_condition)
             graph_builder.add_edge(START, "chatbot")
             graph_builder.add_edge("tools", "chatbot")
             
@@ -89,13 +102,13 @@ class EmailAutomationApp:
             
         except Exception as e:
             raise
-    
+
     def create_message(self) -> str:
         """
         Tool function: Create a response message based on email content.
         
         return:
-            The response from the LLM or an error message
+            The response from the LLM or raise an exception if error
         """
         try:
             # Get job details
@@ -129,7 +142,17 @@ class EmailAutomationApp:
             return result.content
             
         except Exception as e:
-            return f"Failed to create message: {str(e)}"
+             # Reset IDs if message creation fails # note that the final message shows the db info that has been passed down, the db is actually updated
+            try:
+                db.update_email_details(self.job_id, {
+                    "thread_id": "",
+                    "overall_message_id": ""
+                })
+                print(f"Reset IDs after create_message failure for job {self.job_id}")
+            except Exception as db_error:
+                print(f"Failed to reset IDs in database: {str(db_error)}")
+            
+            raise Exception(f"Failed to create message: {str(e)}")
     
     def reply_thread(self) -> str:
         """
@@ -137,7 +160,7 @@ class EmailAutomationApp:
         
             
         return:
-            A string displaying a success message or an error message
+            A string displaying a success message or raise an exception if error
         """
         try:
             # Get job details
@@ -154,15 +177,24 @@ class EmailAutomationApp:
                 "message_id": job["message_id"],
                 "references": job["references"]
             }
-            print("view body: ", new_message)
             
             # Send the reply
             email_service.send_reply(self.job_id, reply_params)
             
-            return "Message reply sent successfully"
+            return {"content": "Message reply sent successfully", "sequence_complete": True}
             
         except Exception as e:
-            return f"Failed to send message: {str(e)}"
+            # Reset IDs if reply fails # note that the final message shows the db info that has been passed down, the db is actually updated
+            try:
+                db.update_email_details(self.job_id, {
+                    "thread_id": "",
+                    "overall_message_id": ""
+                })
+                print(f"Reset IDs after reply_thread failure for job {self.job_id}")
+            except Exception as db_error:
+                print(f"Failed to reset IDs in database: {str(db_error)}")
+                
+            raise Exception(f"Failed to send message: {str(e)}")
     
     def stream_graph_updates(self, user_input: str) -> None:
         """
@@ -221,7 +253,7 @@ class EmailAutomationApp:
             
             if email_result["status"] == "new_message":
                 # Generate a response and then Send the reply
-                user_input = "User: Create a message, and then reply to the thread once"
+                user_input = "User: Please perform these steps in order: 1. Create one message 2. Send one reply 3. Stop"
                 self.stream_graph_updates(user_input)
                 
                 return {
@@ -235,7 +267,8 @@ class EmailAutomationApp:
                     "message": email_result.get("message", "No action taken")
                 }
             
-        except Exception as e:
+        except Exception as e: 
+
             return {
                 "status": "error",
                 "message": f"Error: {str(e)}"

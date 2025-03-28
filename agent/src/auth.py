@@ -50,7 +50,7 @@ class AuthService:
                 'refresh_token': refresh_token,
                 'grant_type': 'refresh_token'
             }
-
+            print("refresh token payload: ", refresh_token)
             # Send the request
             response = requests.post(
                 config.TOKEN_URL,

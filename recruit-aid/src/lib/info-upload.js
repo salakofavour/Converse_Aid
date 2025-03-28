@@ -1,3 +1,5 @@
+'use server'
+
 import { Pinecone } from '@pinecone-database/pinecone';
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 
@@ -10,24 +12,53 @@ const pc = new Pinecone({
 const indexName = process.env.NEXT_PINECONE_INDEX_NAME;
 
 // Function to split input text into chunks
-async function breakText(text) {
+// Function to split input text into chunks
+async function breakText(job_details) {
+  if (!job_details) {
+    throw new Error('job_details is required');
+  }
+
   const textSplitter = new RecursiveCharacterTextSplitter({
     chunkSize: 200,
     chunkOverlap: 40
   });
 
-  // Split the text into chunks
-  const chunks = await textSplitter.splitText(text);
+  // Create text chunks with proper string concatenation
+  const title = `Job title and position is : ${job_details.title || ''}`;
+  const location = `The job location is : ${job_details.location || ''}`;
+  const job_type = `The job type is : ${job_details.job_type || ''}`;
+  const salary = `The salary is : ${job_details.salary_min || ''} - ${job_details.salary_max || ''}`;
+  
+  // Split longer texts
+  const responsibilities = await textSplitter.splitText(`The responsibilities are : ${job_details.responsibilities || ''}`);
+  const qualifications = await textSplitter.splitText(`The qualifications are : ${job_details.qualifications || ''}`);
+
+  // Create array of all chunks
+  const chunks = [
+    title,
+    location,
+    job_type,
+    salary,
+    ...responsibilities,
+    ...qualifications
+  ];
+
+  console.log("Generated chunks:", chunks);
   return chunks;
 }
 
 // Function to create pinecone index, connect to it, and upload input chunks as vectors
-async function uploadVectors(text) {
+export async function uploadVectors(job_details) {
   try {
     // Check if index exists, if not create it
     const indexList = await pc.listIndexes();
+    const indexes = indexList["indexes"]
+    console.log("indexes", indexes);
     
-    if (!indexList.includes(indexName)) {
+    // Check if the index exists by looking for an index with matching name
+    const indexExists = indexes.some(index => index.name === indexName);
+    
+    if (!indexExists) {
       await pc.createIndex({
         name: indexName,
         dimension: 1024,
@@ -48,7 +79,7 @@ async function uploadVectors(text) {
     const index = pc.index(indexName);
 
     // Split text into chunks
-    const docSplits = await breakText(text);
+    const docSplits = await breakText(job_details);
 
     // Create data array with IDs and text
     const data = docSplits.map((text, i) => ({
@@ -56,33 +87,44 @@ async function uploadVectors(text) {
       text: text
     }));
 
+
     // Get embeddings using the inference API
-    const embeddings = await pc.embeddings.embed({
-      model: "multilingual-e5-large",
-      input: data.map(d => d.text),
-      type: "passage"
-    });
+    try{
+      const model = "multilingual-e5-large";
+      const input = data.map(d => d.text);
+
+    var embeddings = await pc.inference.embed(
+      model,
+      input,
+      {
+        input_type: "passage", truncuate:"END"
+      }
+    );
+    console.log("embeddings", embeddings);
+  } catch (error) {
+    console.error('Error in creating embeddings:', error);
+    throw error;
+  }
 
     // Create vectors for upserting
     const vectors = data.map((d, i) => ({
       id: d.id,
-      values: embeddings[i].values,
+      values: embeddings.data[i].values,
       metadata: { text: d.text }
     }));
 
+    if (!Array.isArray(vectors)) {
+      throw new Error('vectors must be an array');
+    }
+    
+    // vectors: vectors,       namespace: job_details.id.toString()
     // Upsert vectors into the index with a namespace
-    await index.upsert({
-      vectors: vectors,
-      namespace: "f97535bd-7939-4dfc-bfd4-a063c38bd95d"
-    });
+    const namespace = job_details.id.toString();
+    await index.namespace(namespace).upsert(vectors);
 
-    console.log(`Check id: ${data[0].id}`);
     return true;
   } catch (error) {
-    console.error('Error in uploadVectors:', error);
-    throw error;
+    // console.error('Error in uploadVectors:', error);
+    throw new Error(error);
   }
 }
-
-// Export the function
-export { uploadVectors };

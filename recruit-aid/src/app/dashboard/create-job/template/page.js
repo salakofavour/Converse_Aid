@@ -17,8 +17,7 @@ export default function JobTemplate() {
     flowStartDate: '',
     flowEndDate: '',
     responsibilities: '',
-    requirements: '',
-    applicants: [],
+    qualifications: '',
     senderEmail: ''
   });
   
@@ -52,22 +51,6 @@ export default function JobTemplate() {
     }
     
     loadSenderEmails();
-  }, []);
-  
-  // Get applicants from localStorage if available
-  useEffect(() => {
-    const storedApplicants = localStorage.getItem('applicants');
-    if (storedApplicants) {
-      try {
-        const parsedApplicants = JSON.parse(storedApplicants);
-        setFormData(prev => ({
-          ...prev,
-          applicants: parsedApplicants
-        }));
-      } catch (error) {
-        console.error('Error parsing applicants from localStorage:', error);
-      }
-    }
   }, []);
   
   const handleChange = (e) => {
@@ -334,37 +317,16 @@ export default function JobTemplate() {
             <div className="space-y-2">
               <p className="text-sm text-gray-600">Enter each qualifications on a new line. These will be formatted as bullet points.</p>
               <textarea
-                id="requirements"
-                name="requirements"
+                id="qualifications"
+                name="qualifications"
                 rows="5"
                 className="form-control focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-all w-full"
                 placeholder="e.g.&#10;X+ years of experience&#10;Proficiency in relevant technologies&#10;Strong communication skills"
-                value={formData.requirements}
+                value={formData.qualifications}
                 onChange={handleChange}
               ></textarea>
             </div>
           </div>
-          
-          {formData.applicants.length > 0 && (
-            <div className="border-b border-gray-200 pb-6">
-              <h2 className="text-xl font-semibold mb-4">Applicants ({formData.applicants.length})</h2>
-              <div className="max-h-60 overflow-y-auto">
-                <ul className="space-y-2">
-                  {formData.applicants.map((applicant, index) => (
-                    <li 
-                      key={index} 
-                      className="flex items-center justify-between bg-gray-50 p-3 rounded hover:bg-gray-100 transition-colors"
-                    >
-                      <div>
-                        <span className="font-medium">{applicant.name}</span>
-                        <span className="text-gray-500 ml-2">({applicant.email})</span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
           
           {/* Sender Email Section */}
           <div className="border-b border-gray-200 pb-6">

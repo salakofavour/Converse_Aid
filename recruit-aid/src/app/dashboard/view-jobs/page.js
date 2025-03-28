@@ -1,6 +1,6 @@
 'use client';
 
-import { getJobs } from '@/lib/supabase';
+import { getApplicants, getJobs } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -9,6 +9,7 @@ export default function ViewJobs() {
   const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [jobApplicants, setJobApplicants] = useState({});
   
   // Load jobs data from Supabase
   useEffect(() => {
@@ -22,6 +23,15 @@ export default function ViewJobs() {
         }
         
         setJobs(jobsData || []);
+
+        // Load applicant counts for each job
+        const applicantCounts = {};
+        await Promise.all((jobsData || []).map(async (job) => {
+          const { applicants } = await getApplicants(job.id);
+          applicantCounts[job.id] = applicants?.length || 0;
+        }));
+        setJobApplicants(applicantCounts);
+
       } catch (err) {
         console.error('Error loading jobs:', err);
         setError(err.message || 'Failed to load jobs');
@@ -134,7 +144,7 @@ export default function ViewJobs() {
                     </div>
                     <div className="flex items-center">
                       <div className="text-sm text-gray-600 mr-3">
-                        <span className="font-medium">{job.applicants?.length || 0}</span>
+                        <span className="font-medium">{jobApplicants[job.id] || 0}</span>
                         <span className="ml-1">applicants</span>
                       </div>
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">

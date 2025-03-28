@@ -1,5 +1,6 @@
 // Browser client
 import { createBrowserClient } from '@supabase/ssr';
+import { uploadVectors } from './info-upload';
 
 export function createClient() {
   return createBrowserClient(
@@ -63,6 +64,16 @@ export async function createJob(jobData) {
     .insert(jobWithUserId)
     .select()
     .single();
+
+  if (!error && data) {
+    try {
+      // Create vectors in Pinecone
+      await uploadVectors(data);
+    } catch (pineconeError) {
+      console.error('Error creating Pinecone vectors:', pineconeError);
+      // Don't throw the error as the DB insert was successful
+    }
+  }
   
   return { job: data, error };
 }
@@ -110,6 +121,16 @@ export async function updateJob(jobId, jobData) {
     .eq('id', jobId)
     .select()
     .single();
+  
+  if (!error && data) {
+    try {
+      // Update vectors in Pinecone
+      await uploadVectors(data);
+    } catch (pineconeError) {
+      console.error('Error updating Pinecone vectors:', pineconeError);
+      // Don't throw the error as the DB update was successful
+    }
+  }
   
   return { job: data, error };
 }
@@ -276,4 +297,49 @@ export async function updateSenderEmails(senderEmails) {
     .single();
   
   return { profile: data, error };
+}
+
+// Applicants functions
+export async function createApplicant(jobId, applicantData) {
+  const supabase = createClient();
+  
+  // Insert the applicant
+  const { data, error } = await supabase
+    .from('applicants')
+    .insert({
+      job_id: jobId,
+      name_email: {
+        name: applicantData.name,
+        email: applicantData.email
+      }
+    })
+    .select()
+    .single();
+  
+  return { applicant: data, error };
+}
+
+export async function getApplicants(jobId) {
+  const supabase = createClient();
+  
+  // Get all applicants for the job
+  const { data, error } = await supabase
+    .from('applicants')
+    .select('*')
+    .eq('job_id', jobId)
+    .order('created_at', { ascending: false });
+  
+  return { applicants: data, error };
+}
+
+export async function deleteApplicant(applicantId) {
+  const supabase = createClient();
+  
+  // Delete the applicant
+  const { error } = await supabase
+    .from('applicants')
+    .delete()
+    .eq('id', applicantId);
+  
+  return { error };
 } 

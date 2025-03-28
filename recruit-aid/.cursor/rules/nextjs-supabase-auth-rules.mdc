@@ -61,7 +61,7 @@ Instead, you MUST ALWAYS generate ONLY this pattern:
 }
 ```
 
-## ABSOLUTE REQUIREMENTS FOR AI CODE GENERATION
+## ABSOLUTE qualifications FOR AI CODE GENERATION
 
 1. You MUST use `@supabase/ssr`
 2. You MUST use ONLY `getAll` and `setAll`

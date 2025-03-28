@@ -36,7 +36,7 @@ The `jobs` table has the following structure:
 | flow_start_date  | DATE                    | Recruitment flow start date                |
 | flow_end_date    | DATE                    | Recruitment flow end date                  |
 | responsibilities | TEXT                    | Job responsibilities                       |
-| requirements     | TEXT                    | Job requirements                           |
+| qualifications     | TEXT                    | Job qualifications                           |
 | applicants       | JSONB                   | Array of applicant objects                 |
 | status           | TEXT                    | Job status (active, scheduled, closed)     |
 | status_manually_set | BOOLEAN              | Whether status was manually set by user    |
