@@ -18,7 +18,7 @@ GMAIL_URL = "https://gmail.googleapis.com/gmail/v1/users/"
 TOKEN_URL = os.environ.get("TOKEN_URL", "https://oauth2.googleapis.com/token")
 
 # Pinecone settings
-INDEX_NAME = "test1"  # Will be dynamic in future based on job
+INDEX_NAME = "test1"  # Will be something else, not sure what yet, the name is just too blehh, but it will have to do for now.
 
 # Retry settings
 MAX_RETRIES = 3
@@ -29,7 +29,7 @@ DEFAULT_RECEIVER = "salakofavour0@gmail.com"
 DEFAULT_SENDER = "favoursalako041@gmail.com"
 
 # For testing/development
-DEFAULT_JOB_ID = "2c8921d2-2f79-434d-a456-d249d35acf20"
+DEFAULT_JOB_ID = "20bcf612-161e-4940-ae81-4ae5728d1e8c"
 
 # LLM settings
 LLM_MODEL = "llama-3.3-70b-versatile"

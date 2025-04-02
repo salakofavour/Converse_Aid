@@ -16,8 +16,10 @@ export default function Navbar({ user }) {
 
   const navLinks = [
     { href: '/dashboard', label: 'Dashboard' },
+    { href: '/dashboard/create-job', label: 'Create Job' },
     { href: '/dashboard/view-jobs', label: 'View Jobs' },
-    { href: '/dashboard/settings', label: 'Settings' },
+    { href: '/dashboard/send-email', label: 'Send Email' },
+    { href: '/dashboard/settings', label: 'Settings' }
   ];
 
   return (

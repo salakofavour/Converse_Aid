@@ -5,6 +5,14 @@ import { getUser } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+const navigation = [
+  { name: 'Dashboard', href: '/dashboard' },
+  { name: 'Create Job', href: '/dashboard/create-job' },
+  { name: 'View Jobs', href: '/dashboard/view-jobs' },
+  { name: 'Send Email', href: '/dashboard/send-email' },
+  { name: 'Settings', href: '/dashboard/settings' }
+];
+
 export default function DashboardLayout({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);

@@ -18,11 +18,11 @@ from src.vector_search import vector_search
 import src.config as config
 
 # Initialize memory saver for the graph
-memory = MemorySaver()
+# memory = MemorySaver()
 
 class State(TypedDict):
     """State object used in the graph."""
-    email_body_prompt: str
+    email_response: str
     messages: List[Dict[str, Any]]
 
 # Function to add messages to the state
@@ -49,14 +49,17 @@ class EmailAutomationApp:
         """
         # Set up the job ID
         self.job_id = job_id or config.DEFAULT_JOB_ID
+        self.applicant_id = None  # Will be set during processing of each applicant
         
-        # Set up LLM and graph
-        self.graph = None
-        self.setup_graph()
+        # # Set up LLM and graph
+        # self.graph = None
+        # self.setup_graph()
+        self.graph = None  # Will be set up for each applicant in run()
     
     def setup_graph(self) -> None:
         """Set up the LangGraph for message processing."""
         try:
+            memory = MemorySaver()
             # Initialize LLM
             llm = ChatGroq(
                 model=config.LLM_MODEL, 
@@ -65,37 +68,24 @@ class EmailAutomationApp:
                 max_retries=3
             )
             
-            # Define tools
-            tools = [self.create_message, self.reply_thread]
-            llm_with_tools = llm.bind_tools(tools)
             
             # Define chatbot function
             def chatbot(state: State):
-                 # Check if we've completed our sequence
-                if "sequence_complete" in state and state["sequence_complete"]:
-                    return {"messages": [], "sequence_complete": True}
-                
-                result = llm_with_tools.invoke(state["messages"])
+                result = llm.invoke(state["messages"])
                 return {"messages": [result]}
             
             # Build graph
             graph_builder = StateGraph(State)
             graph_builder.add_node("chatbot", chatbot)
-            
-            tool_node = ToolNode(tools)
-            graph_builder.add_node("tools", tool_node)
+            graph_builder.add_node("create_message", self.create_message)
+            graph_builder.add_node("reply_thread", self.reply_thread)
 
-            # Add condition to check if sequence is complete -> honestly i dont fully understand this part of the code. 
-            # I know the tools_condition is a prebuilt tooll and get how it works, and i understand that the sequence condition 
-            #  function is more or less checking to see if the output is complet but i still dont fully understand it
-            def sequence_condition(output): #tools condition
-                if "sequence_complete" in output and output["sequence_complete"]: #because the output will not return only "sequence_complete" we first check if it exist in it first
-                    return END
-                return tools_condition(output)
-            
-            graph_builder.add_conditional_edges("chatbot", sequence_condition)
-            graph_builder.add_edge(START, "chatbot")
-            graph_builder.add_edge("tools", "chatbot")
+
+            # add edges
+            graph_builder.add_edge(START, "create_message")
+            graph_builder.add_edge("create_message", "reply_thread")
+            graph_builder.add_edge("reply_thread", END)
+
             
             # Compile the graph
             self.graph = graph_builder.compile(checkpointer=memory)
@@ -103,19 +93,19 @@ class EmailAutomationApp:
         except Exception as e:
             raise
 
-    def create_message(self) -> str:
+    def create_message(self, state: State) -> Dict[str, Any]:
         """
         Tool function: Create a response message based on email content.
         
         return:
-            The response from the LLM or raise an exception if error
+            The updated state with the new message
         """
         try:
-            # Get job details
-            job = db.get_job_details(self.job_id)
+            # Get applicant details
+            applicant = db.get_applicant_details(self.applicant_id)
             
             # Search for relevant information using the email body
-            email_body = job.get("body", "")
+            email_body = applicant.get("body", "")
             search_results = vector_search.search_with_text(email_body)
             
             # Create a prompt with the context
@@ -137,65 +127,96 @@ class EmailAutomationApp:
             )
             result = llm.invoke(full_prompt.text)
             response = result.content
-            db.update_response(self.job_id, response)
             
-            return result.content
+            # Update applicant's response
+            # db.update_applicant_response(self.applicant_id, response)
+            # Update email response in state
+            state["email_response"] = response
+
+            return{
+                "email_response": response,
+                "messages": state.get("messages", []) +[{
+                "content": result.content,
+                "role": "assistant"
+            }]
+                }
             
         except Exception as e:
-             # Reset IDs if message creation fails # note that the final message shows the db info that has been passed down, the db is actually updated
+            # Reset IDs if message creation fails
             try:
-                db.update_email_details(self.job_id, {
+                db.update_applicant_details(self.applicant_id, {
                     "thread_id": "",
                     "overall_message_id": ""
                 })
-                print(f"Reset IDs after create_message failure for job {self.job_id}")
+                print(f"Reset IDs after create_message failure for applicant {self.applicant_id}")
             except Exception as db_error:
                 print(f"Failed to reset IDs in database: {str(db_error)}")
             
-            raise Exception(f"Failed to create message: {str(e)}")
+            # return{"content": f"Failed to create message: {str(e)}", "sequence_complete": True}
+            raise
     
-    def reply_thread(self) -> str:
+    def reply_thread(self, state: State) -> Dict[str, Any]:
         """
         Tool function: Reply to an email thread.
-        
             
         return:
-            A string displaying a success message or raise an exception if error
+            The updated state with the new message
         """
         try:
-            # Get job details
-            job = db.get_job_details(self.job_id)
-
-            new_message = job["response"]
+            # Get applicant details
+            applicant = db.get_applicant_details(self.applicant_id)
+            #get email response kept in state gotten from create_message
+            new_message = state["email_response"]
+            
+            # # Check if response exists and handle None case
+            # if not new_message:
+            #     print(f"No response found for applicant {self.applicant_id}, retrying fetch...")
+            #     # Could be a timing issue, wait briefly and try once more
+            #     time.sleep(1)  # Add import time if not already imported
+            #     applicant = db.get_applicant_details(self.applicant_id)
+            #     new_message = applicant["response"]
+            #     if not new_message:
+            #         return {
+            #             "content": "Cannot send reply: no response message found in database", 
+            #             "sequence_complete": True,
+            #             "tool": None,
+            #             "stop": True
+            #         }
             
             # Prepare reply parameters
             reply_params = {
-                "to": config.DEFAULT_RECEIVER,  # This could be dynamic
+                "to": applicant["name_email"]["email"],
                 "body": new_message,
-                "thread_id": job["thread_id"],
-                "subject": f"Re: {job['subject']}" if not job['subject'].startswith("Re:") else job['subject'],
-                "message_id": job["message_id"],
-                "references": job["references"]
+                "thread_id": applicant["thread_id"],
+                "subject": f"Re: {applicant['subject']}" if not applicant['subject'].startswith("Re:") else applicant['subject'],
+                "message_id": applicant["message_id"],
+                "references": applicant["reference_id"]
             }
             
             # Send the reply
-            email_service.send_reply(self.job_id, reply_params)
+            email_service.send_reply(self.job_id, self.applicant_id, reply_params)
             
-            return {"content": "Message reply sent successfully", "sequence_complete": True}
             
+            return {
+            "messages": state.get("messages", []) + [{
+                "content": "Message reply sent successfully",
+                "role": "assistant"
+            }]
+            }
+                    
         except Exception as e:
-            # Reset IDs if reply fails # note that the final message shows the db info that has been passed down, the db is actually updated
+            # Reset IDs if reply fails
             try:
-                db.update_email_details(self.job_id, {
+                db.update_applicant_details(self.applicant_id, {
                     "thread_id": "",
                     "overall_message_id": ""
                 })
-                print(f"Reset IDs after reply_thread failure for job {self.job_id}")
+                print(f"Reset IDs after reply_thread failure for applicant {self.applicant_id}")
             except Exception as db_error:
                 print(f"Failed to reset IDs in database: {str(db_error)}")
-                
-            raise Exception(f"Failed to send message: {str(e)}")
-    
+            
+            raise
+        
     def stream_graph_updates(self, user_input: str) -> None:
         """
         Process a user input through the graph.
@@ -207,7 +228,12 @@ class EmailAutomationApp:
             if not self.graph:
                 raise ValueError("Graph not initialized")
                 
-            config_data = {"configurable": {"thread_id": self.job_id}}
+            config_data = {
+                "configurable": {
+                    "thread_id": self.applicant_id # thread_id is an expected value, her it is not the email thread id, its just the name of the parameter
+                    # "applicant_id": self.applicant_id
+                }
+            }
                 
             # Initialize state with the user message
             initial_state = {
@@ -215,60 +241,120 @@ class EmailAutomationApp:
                 "messages": [{"role": "user", "content": user_input}]
             }
             
-            events = self.graph.stream(
+            # events = self.graph.stream(
+            #     initial_state,
+            #     config_data,
+            #     stream_mode="values",
+            # )
+            event = self.graph.invoke(
                 initial_state,
                 config_data,
-                stream_mode="values",
             )
-            
-            for event in events:
-                if "messages" in event and event["messages"]:
-                    for message in event["messages"]:
-                        if hasattr(message, "pretty_print"):
-                            message.pretty_print()
-                        else:
-                            print(f"{message.get('role', 'unknown')}: {message.get('content', '')}")
+            if "messages" in event and event["messages"]:
+                for message in event["messages"]:
+                    if hasattr(message, "pretty_print"):
+                        message.pretty_print()
+                    else:
+                        print(f"{message.get('role', 'unknown')}: {message.get('content', '')}")
+            # for event in events:
+            #     if "messages" in event and event["messages"]:
+            #         for message in event["messages"]:
+            #             if hasattr(message, "pretty_print"):
+            #                 message.pretty_print()
+            #             else:
+            #                 print(f"{message.get('role', 'unknown')}: {message.get('content', '')}")
             
         except Exception as e:
             raise
     
     def run(self) -> Dict[str, Any]:
         """
-        Run the email automation workflow.
+        Run the email automation workflow for all applicants of a job.
         
         This method:
         1. Validates auth tokens
-        2. Checks for new emails
-        3. Creates and sends responses if needed
+        2. Gets all applicants for the job
+        3. Processes each applicant's email thread
         
         return:
-            Dict with status and result information
+            Dict with status and results information
         """
         try:
             # Validate authentication tokens
             auth_service.validate_token(self.job_id)
             
-            # Check for new emails
-            email_result = email_service.check_for_new_emails(self.job_id)
+            # Get all applicants for this job
+            applicants = db.get_job_applicants(self.job_id)
             
-            if email_result["status"] == "new_message":
-                # Generate a response and then Send the reply
-                user_input = "User: Please perform these steps in order: 1. Create one message 2. Send one reply 3. Stop"
-                self.stream_graph_updates(user_input)
-                
-                return {
-                    "status": "success",
-                    "message": "Found new email and sent response",
-                    "email_data": email_result.get("email_data")
-                }
-            else:
+            if not applicants:
                 return {
                     "status": "no_action",
-                    "message": email_result.get("message", "No action taken")
+                    "message": "No applicants found for this job"
                 }
+            print("applicants count", len(applicants))
+            results = []
+            for applicant in applicants:
+                try:
+                    # Set current applicant for tools to use
+                    self.applicant_id = applicant['id']
+                    
+                    # Reset graph for each applicant
+                    self.setup_graph()
+
+                    # Check for new emails for this applicant
+                    email_result = email_service.check_for_new_emails(
+                        job_id=self.job_id,
+                        applicant_id=applicant['id'],
+                        applicant_email=applicant['name_email']['email']
+                    )
+                    
+                    if email_result["status"] == "new_message":
+                        print("got here")
+                        # Generate a response and Send the reply
+                        user_input = "User: Please perform these steps in order: 1. Create one message 2. Send one reply 3. END"
+                        self.stream_graph_updates(user_input)
+
+                        results.append({
+                            "applicant_id": applicant['id'],
+                            "email": applicant['name_email']['email'],
+                            "status": "success",
+                            "message": "Found new email and sent response",
+                            "email_data": email_result.get("email_data")
+                                })
+                    else:
+                        results.append({
+                            "applicant_id": applicant['id'],
+                            "email": applicant['name_email']['email'],
+                            "status": "no_action",
+                            "message": email_result.get("message", "No new message, so no action taken")
+                        })
+                        
+                except Exception as e:
+                    results.append({
+                        "applicant_id": applicant['id'],
+                        "email": applicant['name_email']['email'],
+                        "status": "error",
+                        "message": f"Error processing applicant: {str(e)}"
+                    })
+                    continue  # Continue with next applicant even if one fails
+            
+            # Summarize results
+            success_count = sum(1 for r in results if r["status"] == "success")
+            error_count = sum(1 for r in results if r["status"] == "error")
+            no_action_count = sum(1 for r in results if r["status"] == "no_action")
+            
+            return {
+                "status": "completed",
+                "summary": {
+                    "total_applicants": len(applicants),
+                    "successful_responses": success_count,
+                    "errors": error_count,
+                    "no_action_needed": no_action_count
+                },
+                "detailed_results": results
+            }
             
         except Exception as e: 
-
             return {
                 "status": "error",
                 "message": f"Error: {str(e)}"

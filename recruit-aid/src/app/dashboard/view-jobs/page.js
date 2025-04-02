@@ -1,6 +1,8 @@
 'use client';
 
-import { getApplicants, getJobs } from '@/lib/supabase';
+import { deletePineconeNamespace } from '@/lib/pinecone';
+import { deleteJob, getApplicants, getJobs } from '@/lib/supabase';
+import { TrashIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -10,6 +12,7 @@ export default function ViewJobs() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [jobApplicants, setJobApplicants] = useState({});
+  const [deletingJobs, setDeletingJobs] = useState(new Set()); // Track jobs being deleted
   
   // Load jobs data from Supabase
   useEffect(() => {
@@ -60,6 +63,51 @@ export default function ViewJobs() {
     router.push(`/dashboard/view-jobs/${jobId}`);
   };
 
+  // Handle job deletion
+  const handleDeleteJob = async (e, jobId) => {
+    e.stopPropagation(); // Prevent job card click when clicking delete
+
+    // Show confirmation dialog
+    if (!window.confirm('Are you sure you want to delete this job? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeletingJobs(prev => new Set([...prev, jobId]));
+    setError(null);
+
+    try {
+      // Delete from Supabase
+      const { error: supabaseError } = await deleteJob(jobId);
+      if (supabaseError) throw new Error('Failed to delete job from database');
+
+      // Delete from Pinecone
+      try {
+        await deletePineconeNamespace(jobId.toString());
+      } catch (pineconeError) {
+        console.error('Error deleting Pinecone namespace:', pineconeError);
+        // Don't throw here as the job is already deleted from Supabase
+      }
+
+      // Update local state
+      setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
+      setJobApplicants(prev => {
+        const updated = { ...prev };
+        delete updated[jobId];
+        return updated;
+      });
+
+    } catch (err) {
+      console.error('Error deleting job:', err);
+      setError('Failed to delete job. Please try again.');
+    } finally {
+      setDeletingJobs(prev => {
+        const updated = new Set(prev);
+        updated.delete(jobId);
+        return updated;
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -101,9 +149,36 @@ export default function ViewJobs() {
             {jobs.map((job) => (
               <div 
                 key={job.id} 
-                className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer"
+                className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer group relative"
                 onClick={() => handleJobClick(job.id)}
               >
+                {/* Delete button - appears on hover */}
+                <button
+                  onClick={(e) => handleDeleteJob(e, job.id)}
+                  disabled={deletingJobs.has(job.id)}
+                  className={`absolute top-2 right-2 p-2 rounded-full 
+                    ${deletingJobs.has(job.id) 
+                      ? 'bg-gray-100 cursor-not-allowed' 
+                      : 'bg-white hover:bg-red-50'} 
+                    hidden group-hover:block z-10`}
+                  aria-label="Delete job"
+                >
+                  <TrashIcon 
+                    className={`h-5 w-5 ${
+                      deletingJobs.has(job.id) 
+                        ? 'text-gray-400' 
+                        : 'text-red-500 hover:text-red-600'
+                    }`} 
+                  />
+                </button>
+
+                {/* Deletion overlay */}
+                {deletingJobs.has(job.id) && (
+                  <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-20 rounded-lg">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                )}
+
                 <div className="p-5">
                   <div className="flex justify-between items-start mb-4">
                     <h2 className="text-lg font-semibold text-gray-900 line-clamp-2">{job.title}</h2>

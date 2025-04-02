@@ -37,7 +37,7 @@ class DatabaseService:
         except Exception as e:
             raise ConnectionError(f"Could not connect to Supabase: {str(e)}")
     
-    @retry_with_backoff()
+    @retry_with_backoff()#check jobs
     def get_job_details(self, job_id: str) -> Dict[str, Any]:
         """
         Get details for a specific job.
@@ -176,34 +176,34 @@ class DatabaseService:
         except Exception as e:
             raise
     
-    @retry_with_backoff()
-    def update_email_details(self, job_id: str, email_details: Dict[str, Any]) -> bool:
-        """
-        Update email details in the jobs table.
+    # @retry_with_backoff()
+    # def update_email_details(self, job_id: str, email_details: Dict[str, Any]) -> bool:
+    #     """
+    #     Update email details in the jobs table.
         
-        Args:
-            job_id: Job ID
-            email_details: Dict containing thread_id, message_id, etc.
+    #     Args:
+    #         job_id: Job ID
+    #         email_details: Dict containing thread_id, message_id, etc.
             
-        return:
-            Boolean indicating success
+    #     return:
+    #         Boolean indicating success
             
-        Raises:
-            ValueError: If update fails
-        """
-        try:
-            response = (self.client.table('jobs')
-                    .update(email_details)
-                    .eq("id", job_id)
-                    .execute())
+    #     Raises:
+    #         ValueError: If update fails
+    #     """
+    #     try:
+    #         response = (self.client.table('jobs')
+    #                 .update(email_details)
+    #                 .eq("id", job_id)
+    #                 .execute())
                     
-            return True
-        except Exception as e:
-            raise
+    #         return True
+    #     except Exception as e:
+    #         raise
 
     
-    @retry_with_backoff()
-    def update_response(self, job_id: str, response: str) -> bool:
+    # @retry_with_backoff()
+    # def update_response(self, job_id: str, response: str) -> bool:
         """
         Update response column in the jobs table.
         
@@ -223,6 +223,125 @@ class DatabaseService:
                     .eq("id", job_id)
                     .execute())
                     
+            return True
+        except Exception as e:
+            raise
+
+    @retry_with_backoff()
+    def get_job_applicants(self, job_id: str) -> List[Dict[str, Any]]:
+        """
+        Get all applicants for a specific job.
+        
+        Args:
+            job_id: The UUID of the job
+            
+        Returns:
+            List of applicant records
+            
+        Raises:
+            ValueError: If query fails
+        """
+        try:
+            query = (self.client.table('applicants')
+                    .select('id, name_email, thread_id, message_id, body, response, '
+                           'overall_message_id, subject, reference_id')
+                    .eq('job_id', job_id)
+                    .execute())
+            
+            return query.data
+        except Exception as e:
+            raise
+
+    @retry_with_backoff()
+    def get_applicant_details(self, applicant_id: str) -> Dict[str, Any]:
+        """
+        Get details for a specific applicant.
+        
+        Args:
+            applicant_id: The UUID of the applicant
+            
+        Returns:
+            Dict containing applicant details
+            
+        Raises:
+            ValueError: If applicant not found
+        """
+        try:
+            query = (self.client.table('applicants')
+                    .select('*')
+                    .eq('id', applicant_id)
+                    .execute())
+            
+            if not query.data:
+                raise ValueError(f"No applicant found with id: {applicant_id}")
+            
+            return query.data[0]
+        except Exception as e:
+            raise
+
+    # @retry_with_backoff()
+    # def update_applicant_response(self, applicant_id: str, response: str) -> bool:
+    #     """
+    #     Update the response field for an applicant.
+        
+    #     Args:
+    #         applicant_id: The UUID of the applicant
+    #         response: The response text
+            
+    #     Returns:
+    #         Boolean indicating success
+            
+    #     Raises:
+    #         ValueError: If update fails
+    #     """
+    #     try:
+    #         response = (self.client.table('applicants')
+    #                 .update({"response": response})
+    #                 .eq('id', applicant_id)
+    #                 .execute())
+            
+    #         return True
+    #     except Exception as e:
+    #         raise
+
+    @retry_with_backoff()
+    def update_applicant_details(self, applicant_id: str, details: Dict[str, Any]) -> bool:
+        """
+        Update various details for an applicant.
+        
+        Args:
+            applicant_id: The UUID of the applicant
+            details: Dict containing fields to update
+            
+        Returns:
+            Boolean indicating success
+            
+        Raises:
+            ValueError: If update fails
+        """
+        try:
+            # Filter valid fields
+            valid_fields = [
+                "thread_id", 
+                "message_id", 
+                "overall_message_id", 
+                "subject", 
+                "reference_id",
+                "body"
+            ]
+            update_data = {
+                k: v for k, v in details.items() 
+                if k in valid_fields
+            }
+            
+            if not update_data:
+                raise ValueError("No valid fields to update")
+            
+            response = (self.client.table('applicants')
+                    .update(update_data)
+                    .eq('id', applicant_id)
+                    .execute())
+            
             return True
         except Exception as e:
             raise

@@ -135,7 +135,7 @@ class EmailService:
             
             # Extract headers
             subject = next((header['value'] for header in headers if header['name'] == 'Subject'), "")
-            message_id = next((header['value'] for header in headers if header['name'] == 'Message-ID'), "")
+            message_id = next((header['value'] for header in headers if header['name'] == 'Message-Id'), "")
             references = next((header['value'] for header in headers if header['name'] == 'References'), "")
             
             # Get body - handle different message structures
@@ -158,12 +158,13 @@ class EmailService:
             raise
     
     @retry_with_backoff()
-    def send_reply(self, job_id: str, reply_params: Dict[str, Any]) -> Dict[str, Any]:
+    def send_reply(self, job_id: str, applicant_id: str, reply_params: Dict[str, Any]) -> Dict[str, Any]:
         """
         Send a reply to an email thread.
         
         Args:
             job_id: Job ID
+            applicant_id: The ID of the applicant
             reply_params: Dict with reply parameters (to, body, thread_id, etc.)
             
         return:
@@ -185,7 +186,7 @@ class EmailService:
             # Create email message
             message = EmailMessage()
             message.set_content(reply_params.get('body', ''))
-            message["To"] = reply_params.get('to', config.DEFAULT_RECEIVER)
+            message["To"] = reply_params.get('to')  # Should be applicant's email
             message["From"] = reply_params.get('from', token_info['job_email'])
             message["Subject"] = reply_params.get('subject', '')
             
@@ -207,24 +208,26 @@ class EmailService:
             # Send the message
             url = f"{config.GMAIL_URL}me/messages/send"
             response = requests.post(url, headers=headers, json=email_data)
-            print("reply response: ", response)
+            print("send reply response: ", response)
 
             if response.status_code != 200:
                 print(f"Error response body: {response.text}")
                 raise ConnectionError(f"Failed to send email: {response.status_code}")
+            
             
             return response.json()
             
         except Exception as e:
             raise
     
-    def check_for_new_emails(self, job_id: str, search_query: Optional[str] = None) -> Dict[str, Any]:
+    def check_for_new_emails(self, job_id: str, applicant_id: str, applicant_email: str) -> Dict[str, Any]:
         """
-        Check for new emails and process them if found.
+        Check for new emails from a specific applicant.
         
         Args:
-            job_id: Job ID
-            search_query: Custom search query (optional)
+            job_id: Job ID (needed for auth)
+            applicant_id: The ID of the applicant
+            applicant_email: The email address of the applicant
             
         return:
             Dict with status and message data if found
@@ -233,31 +236,26 @@ class EmailService:
             Various exceptions based on operations
         """
         try:
-            # Get job details for context
-            job_details = db.get_job_details(job_id)
+            # Get applicant details for context
+            applicant = db.get_applicant_details(applicant_id)
             
-            # If no search query provided, use default or from job
-            if not search_query:
-                #the below commented out is the search query we are going for later but for now, we wait.
-                # subject = f"subject:{job_details.get('subject', "")}"
-                # from_email = f"from:{job_details.get('Job_email', "")}"
-                # to_email = f"to:{config.DEFAULT_RECEIVER}"
-                # start_date = f"after:{job_details.get('flow_start_date', "")}"
-                # search_query = f"{subject} {from_email} {to_email} {start_date}"
-                search_query = job_details.get('search_query', "subject:Trial to see how this goes")
-            
+            # Build search query for this specific applicant
+            subject = f"subject:{applicant.get('subject', '')}"
+            from_email = f"from:{applicant_email}"
+#            search_query = f"{subject} {from_email}" # for now I will use an hardcoded  value, eventually I wiill use this implementation along with the start date
+            search_query = f"subject:Newest Test {from_email}"
             # Search for matching emails
             messages = self.search_emails(job_id, search_query)
             
             if not messages:
-                return {"status": "no_emails", "message": "No emails found matching the query"}
+                return {"status": "no_emails", "message": f"No emails found from {applicant_email}"}
             
             # Get the latest message's thread
             latest_message = messages[0]
             thread_id = latest_message.get("threadId")
             
             # Check if this is the same thread we've processed before
-            if job_details.get("thread_id") == thread_id and job_details.get("overall_message_id") == latest_message.get("id"):
+            if applicant.get("thread_id") == thread_id and applicant.get("overall_message_id") == latest_message.get("id"):
                 return {
                     "status": "no_new_messages", 
                     "message": "No new messages in the thread since last check"
@@ -268,9 +266,9 @@ class EmailService:
             
             # Get the last message in the thread
             last_message = self.get_last_message(thread)
-            
+
             # Check if we've already processed this message
-            if job_details.get("thread_id") == thread_id and job_details.get("overall_message_id") == last_message.get("id"):
+            if applicant.get("thread_id") == thread_id and applicant.get("overall_message_id") == last_message.get("id"):
                 return {
                     "status": "no_new_messages", 
                     "message": "No new messages in the thread since last check"
@@ -279,17 +277,17 @@ class EmailService:
             # Extract the message data
             message_data = self.extract_message_data(last_message)
             
-            # Update email details in database
+            # Update email details in applicant record
             email_details = {
                 "thread_id": thread_id,
                 "overall_message_id": last_message.get("id"),
                 "subject": message_data["subject"],
                 "body": message_data["body"],
                 "message_id": message_data["message_id"],
-                "references": message_data["references"]
+                "reference_id": message_data["references"]  # Note field name change to match applicant table
             }
             
-            db.update_email_details(job_id, email_details)
+            db.update_applicant_details(applicant_id, email_details)
             
             return {
                 "status": "new_message",
@@ -298,7 +296,7 @@ class EmailService:
             }
             
         except Exception as e:
-            return {"status": "error", "message": f"Error checking for new emails: {str(e)}"}
+            raise
 
 # Create a singleton instance
 email_service = EmailService() 
