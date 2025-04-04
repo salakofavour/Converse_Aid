@@ -242,8 +242,8 @@ class EmailService:
             # Build search query for this specific applicant
             subject = f"subject:{applicant.get('subject', '')}"
             from_email = f"from:{applicant_email}"
-#            search_query = f"{subject} {from_email}" # for now I will use an hardcoded  value, eventually I wiill use this implementation along with the start date
-            search_query = f"subject:Newest Test {from_email}"
+            search_query = f"{subject} {from_email}" #  eventually I wiill use this implementation along with the start date
+            # search_query = f"subject:Newest Test {from_email}" #previously partly haedcoded
             # Search for matching emails
             messages = self.search_emails(job_id, search_query)
             
@@ -253,6 +253,9 @@ class EmailService:
             # Get the latest message's thread
             latest_message = messages[0]
             thread_id = latest_message.get("threadId")
+
+            #repeatation is below, also need to recheck the importance of overall check. dont need overalll_message_id or this check
+            #the check is dumb because it checks if the thread is the same as what we processed before
             
             # Check if this is the same thread we've processed before
             if applicant.get("thread_id") == thread_id and applicant.get("overall_message_id") == latest_message.get("id"):

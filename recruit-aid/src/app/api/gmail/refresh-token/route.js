@@ -62,7 +62,7 @@ export async function POST(request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError) throw new Error('Failed to get authenticated user');
     const userId = user.id;
-    
+
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('sender')
@@ -83,8 +83,6 @@ export async function POST(request) {
           }
         : sender
     );
-
-    console.log("Updated sender", updatedSender);
 
     const { error: updateError } = await supabase
       .from('profiles')

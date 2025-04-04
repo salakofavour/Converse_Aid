@@ -166,7 +166,7 @@ class EmailAutomationApp:
             # Get applicant details
             applicant = db.get_applicant_details(self.applicant_id)
             #get email response kept in state gotten from create_message
-            new_message = state["email_response"]
+            new_message = f"Hi {applicant['name_email']['name']}, {state['email_response']}"
             
             # # Check if response exists and handle None case
             # if not new_message:
