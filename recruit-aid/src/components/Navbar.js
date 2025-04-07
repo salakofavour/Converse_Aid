@@ -16,8 +16,7 @@ export default function Navbar({ user }) {
 
   const navLinks = [
     { href: '/dashboard', label: 'Dashboard' },
-    { href: '/dashboard/create-job', label: 'Create Job' },
-    { href: '/dashboard/view-jobs', label: 'View Jobs' },
+    { href: '/dashboard/view-jobs', label: 'Create/View Job' },
     { href: '/dashboard/send-email', label: 'Send Email' },
     { href: '/dashboard/settings', label: 'Settings' }
   ];
@@ -37,10 +36,10 @@ export default function Navbar({ user }) {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`py-2 ${
+                  className={`py-2 px-4 rounded-lg transition-colors ${
                     pathname === link.href
-                      ? 'text-primary font-medium border-b-2 border-primary'
-                      : 'text-gray-600 hover:text-primary'
+                      ? 'bg-primary text-white font-medium'
+                      : 'bg-primary text-white hover:text-black'
                   }`}
                 >
                   {link.label}
@@ -52,7 +51,7 @@ export default function Navbar({ user }) {
           {/* User Menu */}
           <div className="flex items-center">
             <div className="hidden md:flex items-center">
-              <div className="mr-4 text-sm text-gray-600">
+              <div className="mr-4 text-sm text-gray-600 user-email">
                 {user?.email}
               </div>
               <button

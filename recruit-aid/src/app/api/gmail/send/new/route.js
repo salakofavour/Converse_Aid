@@ -36,11 +36,13 @@ export async function POST(request) {
     // Send to each recipient individually
     for (const recipient of to) {
       try {
-        // Create personalized content
-        const personalizedContent = content.replace(
-          /\{recipient\.name\}/g,
-          recipient.name || ''
-        );
+        // // Create personalized content
+        // const personalizedContent = content.replace(
+        //   /\{recipient\.name\}/g,
+        //   recipient.name || ''
+        // );
+        // Personalize content for this recipient
+        const personalizedContent = content.replaceAll('{{recipientName}}', recipient.name || 'Candidate');
 
         // Create email content
         const emailHeaders = [
@@ -48,7 +50,7 @@ export async function POST(request) {
           'MIME-Version: 1.0',
           `From: ${from}`,
           `To: ${recipient.email}`,
-          'Subject: ' + (subject || 'No Subject'),
+          'Subject: ' + (subject || 'Job Application'),
           '',
           personalizedContent
         ].join('\r\n');
@@ -92,4 +94,4 @@ export async function POST(request) {
       { status: 500 }
     );
   }
-} 
+}

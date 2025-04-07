@@ -155,6 +155,9 @@ class DatabaseService:
                     email_found = True
                     break
             
+            #i dont fully understand the below implementation, i thought it was not neccessary,
+            # but the authentication to gmail is invalid without it, i believe the access_token is
+            # not updating properly withouth the below
             # If email not found, add a new entry instead of raising an error
             if not email_found:
                 print(f"Email {email} not found in sender array. Adding new entry.")
@@ -165,6 +168,7 @@ class DatabaseService:
                     # Include a placeholder refresh_token to prevent errors in get_user_tokens
                     'refresh_token': 'placeholder_refresh_token'
                 })
+                raise ValueError(f"Email {email} not found in sender array. User must have removed from settings after creating Job. Inform them to add it back or end the Job.")
             
             # Step 3: Update the entire sender array
             update_result = (self.client.table('profiles')
@@ -333,6 +337,7 @@ class DatabaseService:
                 k: v for k, v in details.items() 
                 if k in valid_fields
             }
+            print("update_data: ", update_data)
             
             if not update_data:
                 raise ValueError("No valid fields to update")

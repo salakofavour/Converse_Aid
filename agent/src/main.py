@@ -101,13 +101,31 @@ class EmailAutomationApp:
             The updated state with the new message
         """
         try:
+            llm = ChatGroq(
+                model=config.LLM_MODEL, 
+                temperature=config.LLM_TEMPERATURE, 
+                max_tokens=config.LLM_MAX_TOKENS, 
+                max_retries=3
+            )
+
             # Get applicant details
             applicant = db.get_applicant_details(self.applicant_id)
             
-            # Search for relevant information using the email body
+            # Search for relevant information using the last email's body
             email_body = applicant.get("body", "")
-            search_results = vector_search.search_with_text(email_body)
-            
+            print("email_body: ", email_body)
+            receiver = f"hi {applicant.get('name_email', {}).get('name', '')}"
+
+            email_context_prompt = PromptTemplate.from_template(
+                """You are a helpful assistant that is given a conversation thread. Your job is to extract the job related context of the last response not starting with {receiver} in a single sentence.
+                    Understand that the context is going to be used for a semantic search, so it needs to semantically represent the last response not starting with {receiver}.
+                   Conversation Thread: {email_history}\n
+                   """
+            )
+            email_context = llm.invoke(email_context_prompt.invoke({"email_history": email_body, "receiver": receiver}))
+            print("email_context: ", email_context)
+            search_results = vector_search.search_with_text(email_context)
+            # Also provide a summary of the conversation thread in a few sentences.
             # Create a prompt with the context
             if search_results["has_relevant_matches"]:
                 context = search_results["context"]
@@ -116,15 +134,13 @@ class EmailAutomationApp:
             
             # Generate response using template
             prompt = PromptTemplate.from_template(
-                "Provide a simple 2 sentences response that is strictly based on the following text {defined_context} in a professional tone."
+                """You are a helpful recruiting assistant that responds to applicants within a given context. Given a conversation history of {email_history},
+                    provide a 1-2 paragraph(not more than 2 sentences each, and no breaks between sentences except the paragraph break) well structured response strictly based in the given context. \n"
+                    "Context: {context}\n"""
+
             )
-            full_prompt = prompt.invoke({"defined_context": context})
-            llm = ChatGroq(
-                model=config.LLM_MODEL, 
-                temperature=config.LLM_TEMPERATURE, 
-                max_tokens=config.LLM_MAX_TOKENS, 
-                max_retries=3
-            )
+            full_prompt = prompt.invoke({"context": context, "email_history": email_body})
+            
             result = llm.invoke(full_prompt.text)
             response = result.content
             
@@ -142,16 +158,6 @@ class EmailAutomationApp:
                 }
             
         except Exception as e:
-            # Reset IDs if message creation fails
-            try:
-                db.update_applicant_details(self.applicant_id, {
-                    "thread_id": "",
-                    "overall_message_id": ""
-                })
-                print(f"Reset IDs after create_message failure for applicant {self.applicant_id}")
-            except Exception as db_error:
-                print(f"Failed to reset IDs in database: {str(db_error)}")
-            
             # return{"content": f"Failed to create message: {str(e)}", "sequence_complete": True}
             raise
     
@@ -166,7 +172,7 @@ class EmailAutomationApp:
             # Get applicant details
             applicant = db.get_applicant_details(self.applicant_id)
             #get email response kept in state gotten from create_message
-            new_message = f"Hi {applicant['name_email']['name']}, {state['email_response']}"
+            new_message = f"Hi {applicant['name_email']['name']}, \n\n {state['email_response']}" #here i will figure out how to add footers.
             
             # # Check if response exists and handle None case
             # if not new_message:
@@ -194,27 +200,32 @@ class EmailAutomationApp:
             }
             
             # Send the reply
-            email_service.send_reply(self.job_id, self.applicant_id, reply_params)
+            response = email_service.send_reply(self.job_id, self.applicant_id, reply_params)
+            print("response from send_reply: ", response)
             
-            
-            return {
-            "messages": state.get("messages", []) + [{
-                "content": "Message reply sent successfully",
-                "role": "assistant"
-            }]
-            }
+            if response: #response.get("status") == "success"
+                #update applicant details with the new message_id, thread_id and overall_message_id of the just sent email
+                message_data = email_service.get_message(self.job_id, response.get("id"))
+                print("message_data from recently sent message: ", message_data)
+
+                db.update_applicant_details(self.applicant_id, {
+                    "message_id": message_data.get("message_id")
+                })
+
+                return {
+                    "messages": state.get("messages", []) + [{
+                        "content": "Message reply sent successfully",
+                        "role": "assistant"
+                    }]
+                }
+            else:
+                return {
+                    "messages": state.get("messages", []) + [{
+                        "content": "Message reply failed",
+                        "role": "assistant"
+                    }]}
                     
         except Exception as e:
-            # Reset IDs if reply fails
-            try:
-                db.update_applicant_details(self.applicant_id, {
-                    "thread_id": "",
-                    "overall_message_id": ""
-                })
-                print(f"Reset IDs after reply_thread failure for applicant {self.applicant_id}")
-            except Exception as db_error:
-                print(f"Failed to reset IDs in database: {str(db_error)}")
-            
             raise
         
     def stream_graph_updates(self, user_input: str) -> None:

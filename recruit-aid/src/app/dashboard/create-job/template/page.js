@@ -149,11 +149,7 @@ export default function JobTemplate() {
       </div>
 
       <div className="bg-white rounded-lg shadow-custom p-6 transition-all hover:shadow-lg">
-        <div className="space-y-6">
-          <p className="text-gray-600">
-            Use our suggested template to create your job posting quickly.
-          </p>
-          
+        <div className="space-y-6">          
           {submitError && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative animate-fade-in" role="alert">
               <span className="block sm:inline">{submitError}</span>

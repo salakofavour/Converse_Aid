@@ -145,6 +145,44 @@ body {
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
 }
 
+/* Form input text colors */
+.form-control, .form-select, input, textarea, select {
+  color: #000000;
+}
+
+.form-control::placeholder, 
+.form-select::placeholder, 
+input::placeholder, 
+textarea::placeholder, 
+select::placeholder {
+  color: #1a1a1a;
+}
+
+/* Labels and Headers */
+label, 
+.form-label, 
+.text-gray-700,
+h1:not(.text-primary),
+h2:not(.text-primary),
+h3:not(.text-primary),
+h4:not(.text-primary),
+h5:not(.text-primary),
+h6:not(.text-primary) {
+  color: #000000 !important;
+}
+
+/* User email in navbar */
+.text-gray-600.user-email {
+  color: #000000 !important;
+}
+
+/* Keep helper text color */
+.text-gray-500, 
+.text-xs.text-gray-500,
+.text-sm.text-gray-500 {
+  color: #6B7280 !important;
+}
+
 /* Transition utilities */
 .transition-all {
   transition-property: all;
@@ -168,6 +206,7 @@ body {
 .ProseMirror {
   min-height: 200px;
   padding: 1rem;
+  color: #000000;
 }
 
 .ProseMirror:focus {
@@ -184,9 +223,18 @@ body {
 }
 
 .ProseMirror p.is-editor-empty:first-child::before {
-  color: #adb5bd;
+  color: #1a1a1a;
   content: attr(data-placeholder);
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+/* Listbox text colors */
+.listbox-text {
+  color: #000000;
+}
+
+.listbox-placeholder {
+  color: #1a1a1a;
 }

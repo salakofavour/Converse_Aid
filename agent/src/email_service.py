@@ -15,43 +15,43 @@ class EmailService:
     This class provides methods for searching, reading, and sending emails.
     """
     
-    @retry_with_backoff()
-    def search_emails(self, job_id: str, search_query: str) -> List[Dict[str, Any]]:
-        """
-        Search for emails matching a query.
+    # @retry_with_backoff()
+    # def search_emails(self, job_id: str, search_query: str) -> List[Dict[str, Any]]:
+    #     """
+    #     Search for emails matching a query.
         
-        Args:
-            job_id: Job ID to get authentication info
-            search_query: Gmail search query string
+    #     Args:
+    #         job_id: Job ID to get authentication info
+    #         search_query: Gmail search query string
             
-        return:
-            List of matching message dictionaries
+    #     return:
+    #         List of matching message dictionaries
             
-        Raises:
-            ConnectionError: If Gmail API request fails
-        """
-        try:
-            # Get valid access token
-            token_info = auth_service.validate_token(job_id)
+    #     Raises:
+    #         ConnectionError: If Gmail API request fails
+    #     """
+    #     try:
+    #         # Get valid access token
+    #         token_info = auth_service.validate_token(job_id)
             
-            # Set up request headers
-            headers = {
-                "Authorization": f"Bearer {token_info['access_token']}"
-            }
+    #         # Set up request headers
+    #         headers = {
+    #             "Authorization": f"Bearer {token_info['access_token']}"
+    #         }
             
-            # Make the API request
-            url = f"{config.GMAIL_URL}me/messages?q={search_query}"
-            result = requests.get(url, headers=headers)
+    #         # Make the API request
+    #         url = f"{config.GMAIL_URL}me/messages?q={search_query}"
+    #         result = requests.get(url, headers=headers)
             
-            if result.status_code != 200:
-                raise ConnectionError(f"Gmail API search failed: {result.status_code}")
+    #         if result.status_code != 200:
+    #             raise ConnectionError(f"Gmail API search failed: {result.status_code}")
             
-            # Parse results
-            messages = result.json().get('messages', [])
+    #         # Parse results
+    #         messages = result.json().get('messages', [])
             
-            return messages
-        except Exception as e:
-            raise
+    #         return messages
+    #     except Exception as e:
+    #         raise
     
     @retry_with_backoff()
     def get_thread(self, job_id: str, thread_id: str) -> Dict[str, Any]:
@@ -71,15 +71,18 @@ class EmailService:
         try:
             # Get valid access token
             token_info = auth_service.validate_token(job_id)
+            print("token_info: ", token_info)
             
             # Set up request headers
             headers = {
-                "Authorization": f"Bearer {token_info['access_token']}"
+                "Authorization": f"Bearer {token_info['access_token']}",
+                "Accept": "application/json"
             }
             
             # Make the API request
             url = f"{config.GMAIL_URL}me/threads/{thread_id}"
             thread_response = requests.get(url, headers=headers)
+            print("thread_response: ", thread_response)
             
             if thread_response.status_code != 200:
                 raise ConnectionError(f"Gmail API thread fetch failed: {thread_response.status_code}")
@@ -87,6 +90,47 @@ class EmailService:
             thread = thread_response.json()
             
             return thread
+        except Exception as e:
+            raise
+
+    @retry_with_backoff()
+    def get_message(self, job_id: str, gmail_id: str) -> Dict[str, Any]:
+        """
+        Get a specific message by its ID and process it.
+        
+        Args:
+            job_id: Job ID to get authentication info
+            message_id: Gmail message ID to retrieve
+            
+        return:
+            Processed message dictionary containing subject, body, message_id, etc.
+            
+        Raises:
+            ConnectionError: If Gmail API request fails
+        """
+        try:
+            # Get valid access token
+            token_info = auth_service.validate_token(job_id)
+            
+            # Set up request headers
+            headers = {
+                "Authorization": f"Bearer {token_info['access_token']}"
+            }
+            
+            # Make the API request
+            url = f"{config.GMAIL_URL}me/messages/{gmail_id}"
+            message_response = requests.get(url, headers=headers)
+            
+            if message_response.status_code != 200:
+                raise ConnectionError(f"Gmail API message fetch failed: {message_response.status_code}")
+            
+            # Get the raw message
+            message = message_response.json()
+            
+            # Process the message using existing extract_message_data method
+            processed_message = self.extract_message_data(message)
+            
+            return processed_message
         except Exception as e:
             raise
     
@@ -239,30 +283,33 @@ class EmailService:
             # Get applicant details for context
             applicant = db.get_applicant_details(applicant_id)
             
-            # Build search query for this specific applicant
-            subject = f"subject:{applicant.get('subject', '')}"
-            from_email = f"from:{applicant_email}"
-            search_query = f"{subject} {from_email}" #  eventually I wiill use this implementation along with the start date
-            # search_query = f"subject:Newest Test {from_email}" #previously partly haedcoded
-            # Search for matching emails
-            messages = self.search_emails(job_id, search_query)
+            # # Build search query for this specific applicant
+            # subject = f"subject:{applicant.get('subject', '')}"
+            # from_email = f"from:{applicant_email}"
+            # search_query = f"{subject} {from_email}" #  eventually I wiill use this implementation along with the start date
+            # # search_query = f"subject:Newest Test {from_email}" #previously partly haedcoded
+            # # Search for matching emails
+            # messages = self.search_emails(job_id, search_query)
             
-            if not messages:
-                return {"status": "no_emails", "message": f"No emails found from {applicant_email}"}
+            # if not messages:
+            #     return {"status": "no_emails", "message": f"No emails found from {applicant_email}"}
             
-            # Get the latest message's thread
-            latest_message = messages[0]
-            thread_id = latest_message.get("threadId")
+            # # Get the latest message's thread
+            # latest_message = messages[0]
+            # thread_id = latest_message.get("threadId")
 
-            #repeatation is below, also need to recheck the importance of overall check. dont need overalll_message_id or this check
-            #the check is dumb because it checks if the thread is the same as what we processed before
+            # #repeatation is below, also need to recheck the importance of overall check. dont need overalll_message_id or this check
+            # #the check is dumb because it checks if the thread is the same as what we processed before
             
-            # Check if this is the same thread we've processed before
-            if applicant.get("thread_id") == thread_id and applicant.get("overall_message_id") == latest_message.get("id"):
-                return {
-                    "status": "no_new_messages", 
-                    "message": "No new messages in the thread since last check"
-                }
+            # # Check if this is the same thread we've processed before
+            # if applicant.get("thread_id") == thread_id and applicant.get("overall_message_id") == latest_message.get("id"):
+            #     return {
+            #         "status": "no_new_messages", 
+            #         "message": "No new messages in the thread since last check"
+            #     }
+            thread_id = applicant.get("thread_id")
+            if not thread_id:
+                raise ValueError("Thread ID not found in applicant record, ensure the user has sent at least one email to the applicant")
             
             # Get the full thread
             thread = self.get_thread(job_id, thread_id)
@@ -270,24 +317,24 @@ class EmailService:
             # Get the last message in the thread
             last_message = self.get_last_message(thread)
 
-            # Check if we've already processed this message
-            if applicant.get("thread_id") == thread_id and applicant.get("overall_message_id") == last_message.get("id"):
+
+            # Extract the last message's data
+            message_data = self.extract_message_data(last_message)
+
+            # Check if we've already processed this message(or it's from the user/agent. We only want to proceed with processing messages from the applicants)
+            if applicant.get("message_id") == message_data.get("message_id"):
                 return {
                     "status": "no_new_messages", 
                     "message": "No new messages in the thread since last check"
                 }
             
-            # Extract the message data
-            message_data = self.extract_message_data(last_message)
             
-            # Update email details in applicant record
+            # Update email details in applicant record ->  this is just to supply the body of the applicants response 
+            # to the vector search, it annoys me a bit i need to call a db operation just for one variable
+            #but that is how needed it is for now. I wont update the body after a reply, as that is not needed
+            # I only need the body from an applicants reply
             email_details = {
-                "thread_id": thread_id,
-                "overall_message_id": last_message.get("id"),
-                "subject": message_data["subject"],
-                "body": message_data["body"],
-                "message_id": message_data["message_id"],
-                "reference_id": message_data["references"]  # Note field name change to match applicant table
+                "body": message_data["body"]
             }
             
             db.update_applicant_details(applicant_id, email_details)

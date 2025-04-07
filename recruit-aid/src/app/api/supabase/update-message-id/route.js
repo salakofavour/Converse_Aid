@@ -38,11 +38,12 @@ export async function POST(request) {
     );
 
     // Update each applicant's message_id and headers
-    const updates = applicants.map(({ id, gmailId, messageId, threadId, references }) => 
+    const updates = applicants.map(({ id, gmailId, messageId, threadId, references, subject }) => 
       supabase
         .from('applicants')
         .update({
           message_id: messageId || null,
+          subject: subject || null,
           thread_id: threadId || null,
           reference_id: references || null,
           response: null,

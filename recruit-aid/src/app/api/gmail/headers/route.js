@@ -108,20 +108,24 @@ export async function GET(request) {
       userId: 'me',
       id: gmailId,
       format: 'metadata',
-      metadataHeaders: ['Message-Id', 'References']
+      metadataHeaders: ['Message-Id', 'References', 'Subject']
     });
 
     // Extract headers
     const headers = response.data.payload.headers;
     const messageId = headers.find(h => h.name === 'Message-Id')?.value || null;
     const references = headers.find(h => h.name === 'References')?.value || null;
+    const subject = headers.find(h => h.name === 'Subject')?.value || null;
     const threadId = response.data.threadId || null;
+
+    console.log("all the headers", headers);
 
     return NextResponse.json({
       messageId,
       threadId,
       references,
-      gmailId
+      gmailId,
+      subject
     });
 
   } catch (error) {

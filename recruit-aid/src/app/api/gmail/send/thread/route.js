@@ -46,12 +46,18 @@ export async function POST(request) {
         const personalizedContent = content.replaceAll('{{recipientName}}', recipient.name || 'Candidate');
 
         let references = ''; //the logic here is the referenceId is the messageId of all previous messages. If i had taken previous 
-        // messages through the agent, it would be seved in the db, if it is not in db, then there has been only one meessage(the original one from the user)
+        // messages through the agent, it would be saved in the db, if it is not in db, then there has been only one meessage(the original one from the user)
         //the message id of that has been saved, so the referenceId is the messageId of the previous message.
+        let subject ="";
         if(recipient.referenceId){
           references = recipient.referenceId;
         }else{
           references = recipient.messageId;
+        }
+        if(recipient.subject){
+          subject = recipient.subject.startsWith("Re:") ? recipient.subject : "Re: " + recipient.subject;
+        }else{
+          subject = "Re: Job Application";
         }
 
         // Create individual email content with threading headers
@@ -60,7 +66,7 @@ export async function POST(request) {
           'MIME-Version: 1.0',
           `From: ${from}`,
           `To: ${recipient.email}`,
-          'Subject: ' + (subject || 'No Subject'),
+          `Subject: ${subject}`,
           `References: ${references}`,
           `In-Reply-To: ${recipient.messageId}`,
           '',

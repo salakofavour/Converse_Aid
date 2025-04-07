@@ -79,7 +79,7 @@ export async function POST(request) {
         ? {
             ...sender,
             access_token,
-            access_expires_in: expiry_date
+            access_expires_in: expiry_date/1000 //convert from milliseconds to seconds
           }
         : sender
     );

@@ -30,6 +30,9 @@ class AuthService:
             ConnectionError: If token refresh request fails
         """
         try:
+            # refresh_token = "1//0f40aXI5_zf6yCgYIARAAGA8SNwF-L9IrRt7NOda6obJ1gP8xl-7-Y6jUomvfdbNfyWMPTeKcNhvPyXJwAiVugBf_ZQUlzkhQFjg"
+            # "1//04xIzrOD-_Uu5CgYIARAAGAQSNwF-L9Irnvmi88elJOaxbK47FQ6MNhAH-51SNG8Gnhf7ned9kPD0av3BHle4pqymAKYJaaaasm0"
+            # "1//0f40aXI5_zf6yCgYIARAAGA8SNwF-L9IrRt7NOda6obJ1gP8xl-7-Y6jUomvfdbNfyWMPTeKcNhvPyXJwAiVugBf_ZQUlzkhQFjg"
             # Extract the email from the user_id object
             if not isinstance(user_id, dict) and not hasattr(user_id, 'data'):
                 raise ValueError("user_id must be a database result object with data attribute")
@@ -65,7 +68,10 @@ class AuthService:
             response_data = response.json()
             access_token = response_data['access_token']
             expires_in = response_data['expires_in']
-            access_expires_in = time.time() + expires_in
+            access_expires_in = time.time() + expires_in #saves expiry time in seconds
+
+            # print("access_token: ", access_token)
+            # print("access_expires_in: ", access_expires_in.utcnow())
 
             # Update the database with the new token
             db.update_access_token(actual_user_id, email, access_token, access_expires_in)

@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 export default function NewMessage() {
   const [selectedJob, setSelectedJob] = useState(null);
   const [selectedApplicants, setSelectedApplicants] = useState([]);
+  const [subject, setSubject] = useState('');
   const [jobs, setJobs] = useState([]);
   const [applicants, setApplicants] = useState([]);
   const [isLoadingJobs, setIsLoadingJobs] = useState(true);
@@ -127,7 +128,8 @@ export default function NewMessage() {
   // Handle sending email
   const handleSend = async () => {
     try {
-      if (!selectedJob || !selectedApplicants.length || !editor?.getHTML()) {
+      const trimmedSubject = subject.trim();
+      if (!selectedJob || !selectedApplicants.length || !editor?.getHTML() || !trimmedSubject) {
         setError('Please fill in all required fields');
         return;
       }
@@ -157,7 +159,7 @@ export default function NewMessage() {
         sender.refresh_token
       );
 
-      // Send email
+      // Send email with custom subject
       const sendResponse = await fetch('/api/gmail/send/new', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -169,7 +171,7 @@ export default function NewMessage() {
             email: app.email
           })),
           content: editor.getHTML(),
-          subject: `[${selectedJob.title}] -  ${selectedJob.id.toString()}`,
+          subject: trimmedSubject,
           access_token
         })
       });
@@ -191,7 +193,8 @@ export default function NewMessage() {
               gmailId: recipient.gmailId,
               messageId: headerData.messageId,
               threadId: headerData.threadId,
-              references: headerData.references
+              references: headerData.references,
+              subject: headerData.subject
             };
           } catch (error) {
             console.error(`Failed to fetch headers for recipient ${recipient.email}:`, error);
@@ -233,6 +236,7 @@ export default function NewMessage() {
       // Reset form
       setSelectedJob(null);
       setSelectedApplicants([]);
+      setSubject('');
       editor.commands.setContent('');
 
     } catch (err) {
@@ -243,7 +247,7 @@ export default function NewMessage() {
     }
   };
 
-  const isFormValid = selectedJob && selectedApplicants.length > 0 && editor?.getHTML();
+  const isFormValid = selectedJob && selectedApplicants.length > 0 && subject.trim() && editor?.getHTML();
 
   return (
     <div className="space-y-6">
@@ -269,7 +273,7 @@ export default function NewMessage() {
               <Listbox.Button className={`relative w-full cursor-default rounded-lg bg-white py-2 pl-3 pr-10 text-left border ${
                 isLoadingJobs || isSending ? 'bg-gray-50 cursor-not-allowed' : 'border-gray-300 hover:border-gray-400'
               } focus:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-opacity-50`}>
-                <span className="block truncate">
+                <span className={`block truncate ${selectedJob ? 'text-black' : 'text-[#1a1a1a]'}`}>
                   {isLoadingJobs ? 'Loading jobs...' : (selectedJob?.title || 'Select a job')}
                 </span>
                 <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
@@ -313,7 +317,7 @@ export default function NewMessage() {
                 <Listbox.Button className={`relative w-full cursor-default rounded-lg bg-white py-2 pl-3 pr-10 text-left border ${
                   !selectedJob || isLoadingApplicants || isSending ? 'bg-gray-50 cursor-not-allowed' : 'border-gray-300 hover:border-gray-400'
                 } focus:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-opacity-50`}>
-                  <span className="block truncate">
+                  <span className={`block truncate ${selectedApplicants.length > 0 ? 'text-black' : 'text-[#1a1a1a]'}`}>
                     {isLoadingApplicants ? 'Loading applicants...' : 
                       selectedApplicants.length === 0 ? 'Select applicants' :
                       `${selectedApplicants.length} applicant(s) selected`}
@@ -380,6 +384,25 @@ export default function NewMessage() {
           </div>
         </div>
 
+        {/* Subject Field */}
+        <div className="space-y-1">
+          <label className="block text-sm font-medium text-gray-700">Subject:</label>
+          <div className={`relative ${!selectedApplicants.length || isSending ? 'opacity-60' : ''}`}>
+            <input
+              type="text"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              disabled={!selectedApplicants.length || isSending}
+              placeholder="Enter email subject"
+              className={`mt-1 block w-full rounded-md ${
+                !selectedApplicants.length || isSending
+                  ? 'bg-gray-50 cursor-not-allowed border-gray-200'
+                  : 'bg-white border-gray-300 hover:border-gray-400'
+              } px-3 py-2 border shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary text-black placeholder-[#1a1a1a]`}
+            />
+          </div>
+        </div>
+
         {/* Message Editor */}
         <div className="space-y-1">
           <label className="block text-sm font-medium text-gray-700">Message</label>
@@ -389,7 +412,10 @@ export default function NewMessage() {
                 ? 'bg-gray-50 cursor-not-allowed border-gray-200 border-dashed' 
                 : 'bg-white border-gray-300 hover:border-gray-400'
             } shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary`}>
-              <EditorContent editor={editor} />
+              <EditorContent 
+                editor={editor} 
+                className="prose prose-sm sm:prose lg:prose-lg xl:prose-2xl focus:outline-none min-h-[200px] p-4 text-black [&_p.is-editor-empty:first-child::before]:text-[#1a1a1a]"
+              />
             </div>
           </div>
         </div>
