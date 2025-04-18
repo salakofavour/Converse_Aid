@@ -113,11 +113,12 @@ class VectorSearchService:
         except Exception as e:
             raise
     
-    def search_with_text(self, text: str, index_name: Optional[str] = None) -> Dict[str, Any]:
+    def search_with_text(self, job_id: str, text: str, index_name: Optional[str] = None) -> Dict[str, Any]:
         """
         Search Pinecone using a text string.
         
         Args:
+            job_id: Job ID
             text: Text to search for
             index_name: Name of the index to search (defaults to config)
             
@@ -136,7 +137,8 @@ class VectorSearchService:
             embedding = self.embed_text(text)
             
             #namespace is the job id
-            job_details = db.get_job_details(config.DEFAULT_JOB_ID)
+            # job_details = db.get_job_details(config.DEFAULT_JOB_ID)
+            job_details = db.get_job_details(job_id)
             namespace = job_details.get('id', "example1")
             # Search using the embedding
             search_results = self.search(index_name, embedding, namespace)

@@ -619,10 +619,11 @@ useEffect(() => {
                   <p className="text-sm text-gray-500 mb-4">Manage your account settings and subscription</p>
                   
                   <button
+                    type="button"
                     className="btn btn-primary"
-                    onClick={() => alert('Upgrade functionality coming soon!')}
+                    onClick={() => router.push('/dashboard/settings/subscription')}
                   >
-                    Upgrade to Pro
+                    View Plan
                   </button>
                 </div>
               </div>

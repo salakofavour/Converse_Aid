@@ -124,7 +124,7 @@ class EmailAutomationApp:
             )
             email_context = llm.invoke(email_context_prompt.invoke({"email_history": email_body, "receiver": receiver}))
             print("email_context: ", email_context)
-            search_results = vector_search.search_with_text(email_context)
+            search_results = vector_search.search_with_text(self.job_id, email_context)
             # Also provide a summary of the conversation thread in a few sentences.
             # Create a prompt with the context
             if search_results["has_relevant_matches"]:

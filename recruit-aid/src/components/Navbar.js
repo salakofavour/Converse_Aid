@@ -22,24 +22,24 @@ export default function Navbar({ user }) {
   ];
 
   return (
-    <nav className="bg-white shadow-sm sticky top-0 z-10">
-      <div className="container mx-auto px-4 py-3">
+    <nav className="bg-white shadow-md sticky top-0 z-50">
+      <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <Link href="/dashboard" className="text-2xl font-bold text-primary mr-8">
+          <div className="flex items-center space-x-8">
+            <Link href="/dashboard" className="text-2xl font-bold text-primary hover:text-primary-dark transition-colors">
               RecruitAid
             </Link>
             
             {/* Desktop Navigation */}
-            <div className="hidden md:flex space-x-6">
+            <div className="hidden md:flex items-center space-x-2">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`py-2 px-4 rounded-lg transition-colors ${
+                  className={`py-2 px-4 rounded-lg transition-all ${
                     pathname === link.href
-                      ? 'bg-primary text-white font-medium'
-                      : 'bg-primary text-white hover:text-black'
+                      ? 'bg-primary text-white font-medium shadow-md'
+                      : 'text-gray-600 hover:bg-blue-50 hover:text-primary'
                   }`}
                 >
                   {link.label}
@@ -50,13 +50,13 @@ export default function Navbar({ user }) {
           
           {/* User Menu */}
           <div className="flex items-center">
-            <div className="hidden md:flex items-center">
-              <div className="mr-4 text-sm text-gray-600 user-email">
+            <div className="hidden md:flex items-center space-x-4">
+              <div className="text-sm text-gray-600 bg-blue-50 py-1 px-3 rounded-full">
                 {user?.email}
               </div>
               <button
                 onClick={handleSignOut}
-                className="btn btn-outline-primary btn-sm"
+                className="btn btn-outline-primary btn-sm hover:bg-primary hover:text-white transition-all"
               >
                 Sign Out
               </button>
@@ -66,7 +66,8 @@ export default function Navbar({ user }) {
             <div className="md:hidden">
               <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="text-gray-600 focus:outline-none"
+                className="text-gray-600 hover:text-primary focus:outline-none focus:text-primary transition-colors"
+                aria-label="Toggle menu"
               >
                 <svg
                   className="h-6 w-6"
@@ -90,29 +91,29 @@ export default function Navbar({ user }) {
         
         {/* Mobile Menu */}
         {isMenuOpen && (
-          <div className="md:hidden mt-3 pb-3 border-t border-gray-200">
-            <div className="pt-3 space-y-3">
+          <div className="md:hidden mt-4 pb-4 border-t border-gray-100 animate-fade-in">
+            <div className="pt-4 space-y-2">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`block py-2 ${
+                  className={`block py-2 px-4 rounded-lg transition-colors ${
                     pathname === link.href
-                      ? 'text-primary font-medium'
-                      : 'text-gray-600'
+                      ? 'bg-primary text-white font-medium'
+                      : 'text-gray-600 hover:bg-blue-50 hover:text-primary'
                   }`}
                   onClick={() => setIsMenuOpen(false)}
                 >
                   {link.label}
                 </Link>
               ))}
-              <div className="pt-3 border-t border-gray-200">
-                <div className="mb-2 text-sm text-gray-600">
+              <div className="pt-4 mt-4 border-t border-gray-100">
+                <div className="mb-3 text-sm text-gray-600 px-4">
                   {user?.email}
                 </div>
                 <button
                   onClick={handleSignOut}
-                  className="btn btn-outline-primary btn-sm w-full"
+                  className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                 >
                   Sign Out
                 </button>
