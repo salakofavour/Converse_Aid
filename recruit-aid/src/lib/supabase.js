@@ -30,8 +30,18 @@ export async function signOut() {
 
 export async function getSession() {
   const supabase = createClient();
+  // First get the authenticated user
+  const { user, error: userError } = await supabase.auth.getUser();
+  if (userError) {
+    return { session: null, error: userError };
+  }
+  // Then get the session data
   const { data, error } = await supabase.auth.getSession();
-  return { session: data.session, error };
+  // Only return session if user is authenticated
+  return { 
+    session: user ? data.session : null, 
+    error 
+  };
 }
 
 export async function getUser() {
@@ -342,4 +352,22 @@ export async function deleteApplicant(applicantId) {
     .eq('id', applicantId);
   
   return { error };
+}
+
+export async function updateAgentState(jobId, newState) {
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('jobs')
+      .update({ agent_state: newState })
+      .eq('id', jobId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error updating agent state:', error);
+    return { data: null, error };
+  }
 } 

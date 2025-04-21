@@ -58,8 +58,10 @@ export default function EditJob() {
           throw new Error('Job not found');
         }
         
-        // Check if job is closed - redirect to view page if it is
-        if (job.status === 'closed') {
+        // Check if job is closed based on end date
+        const currentDate = new Date();
+        const endDate = new Date(job.flow_end_date);
+        if (currentDate > endDate) {
           router.push(`/dashboard/view-jobs/${params.id}`);
           return;
         }
@@ -70,24 +72,6 @@ export default function EditJob() {
           const date = new Date(dateString);
           return date.toISOString().split('T')[0];
         };
-        
-        // Determine status based on dates
-        const currentDate = new Date();
-        const startDate = new Date(job.flow_start_date);
-        const endDate = new Date(job.flow_end_date);
-        
-        let calculatedStatus = job.status;
-        
-        // Only auto-update status if user hasn't manually set it
-        if (!job.status_manually_set) {
-          if (currentDate < startDate) {
-            calculatedStatus = 'scheduled';
-          } else if (currentDate > endDate) {
-            calculatedStatus = 'closed';
-          } else {
-            calculatedStatus = 'active';
-          }
-        }
         
         setFormData({
           title: job.title || '',
@@ -100,9 +84,6 @@ export default function EditJob() {
           flowEndDate: formatDateForInput(job.flow_end_date),
           responsibilities: job.responsibilities || '',
           qualifications: job.qualifications || '',
-          status: calculatedStatus || 'active',
-          statusManuallySet: job.status_manually_set || false,
-          applicants: job.applicants || [],
           Job_email: job.Job_email || ''
         });
       } catch (err) {
@@ -169,64 +150,21 @@ export default function EditJob() {
   // Handle input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
-    if (name === 'status') {
-      // Mark status as manually set when user changes it
-      setFormData(prev => ({ 
-        ...prev, 
-        [name]: value,
-        statusManuallySet: true 
-      }));
-    } else if (name === 'flowStartDate' || name === 'flowEndDate') {
-      // When dates change, recalculate status if not manually set
-      setFormData(prev => {
-        const newData = { ...prev, [name]: value };
-        
-        if (!prev.statusManuallySet) {
-          const currentDate = new Date();
-          const startDate = name === 'flowStartDate' ? new Date(value) : new Date(prev.flowStartDate);
-          const endDate = name === 'flowEndDate' ? new Date(value) : new Date(prev.flowEndDate);
-          
-          if (currentDate < startDate) {
-            newData.status = 'scheduled';
-          } else if (currentDate > endDate) {
-            newData.status = 'closed';
-          } else {
-            newData.status = 'active';
-          }
-        }
-        
-        return newData;
-      });
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
-    }
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
   
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validate form
-    if (!formData.title || !formData.department || !formData.location || !formData.jobType || 
-        !formData.flowStartDate || !formData.flowEndDate || !formData.Job_email) {
-      setError('Please fill in all required fields');
-      return;
-    }
-    
-    // Validate dates
-    const startDate = new Date(formData.flowStartDate);
-    const endDate = new Date(formData.flowEndDate);
-    
-    if (endDate < startDate) {
-      setError('End date cannot be before start date');
-      return;
-    }
-    
     setIsSubmitting(true);
     setError(null);
-    
+
     try {
+      // Determine status based on end date
+      const currentDate = new Date();
+      const endDate = new Date(formData.flowEndDate);
+      const status = currentDate <= endDate ? 'active' : 'closed';
+
       // Prepare job data for submission
       const jobData = {
         title: formData.title,
@@ -239,24 +177,18 @@ export default function EditJob() {
         flow_end_date: formData.flowEndDate,
         responsibilities: formData.responsibilities,
         qualifications: formData.qualifications,
-        status: formData.status,
-        status_manually_set: formData.statusManuallySet,
-        Job_email: formData.Job_email
+        Job_email: formData.Job_email,
+        status: status
       };
+
+      const { error: updateError } = await updateJob(params.id, jobData);
       
-      // Update job in Supabase
-      const { job, error: updateError } = await updateJob(params.id, jobData);
+      if (updateError) throw new Error(updateError.message);
       
-      if (updateError) {
-        throw new Error(updateError.message);
-      }
-      
-      // Navigate to job details page
       router.push(`/dashboard/view-jobs/${params.id}`);
-      
     } catch (err) {
       console.error('Error updating job:', err);
-      setError(err.message || 'An error occurred while updating the job');
+      setError(err.message || 'Failed to update job');
     } finally {
       setIsSubmitting(false);
     }
@@ -484,29 +416,6 @@ export default function EditJob() {
                 className="form-input block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
                 required
               />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="status" className="block text-sm font-medium text-gray-700">
-                Status <span className="text-red-500">*</span>
-              </label>
-              <select
-                id="status"
-                name="status"
-                value={formData.status}
-                onChange={handleChange}
-                className="form-select block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
-                required
-              >
-                <option value="active">Active</option>
-                <option value="scheduled">Scheduled</option>
-                <option value="closed">Closed</option>
-              </select>
-              <p className="text-xs text-gray-500">
-                {formData.statusManuallySet 
-                  ? "Status manually set" 
-                  : "Status automatically determined by dates"}
-              </p>
             </div>
           </div>
           

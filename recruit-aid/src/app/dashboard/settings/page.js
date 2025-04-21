@@ -32,6 +32,11 @@ export default function Settings() {
   const [error, setError] = useState(null);
   const [isNewProfile, setIsNewProfile] = useState(false);
   const [isProcessingOAuth, setIsProcessingOAuth] = useState(false);
+  const [showEmailChangeModal, setShowEmailChangeModal] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('');
+  const [securityError, setSecurityError] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Load user profile data
   useEffect(() => {
@@ -326,6 +331,87 @@ useEffect(() => {
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleEmailChange = async () => {
+    if (!newEmail) {
+      setSecurityError('Please enter a new email address');
+      return;
+    }
+
+    if (!validateEmail(newEmail)) {
+      setSecurityError('Please enter a valid email address');
+      return;
+    }
+
+    setIsProcessing(true);
+    setSecurityError('');
+
+    try {
+      const response = await fetch('/api/account/change-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ newEmail })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to change email');
+      }
+
+      alert(data.message);
+      setShowEmailChangeModal(false);
+      setNewEmail('');
+    } catch (err) {
+      console.error('Error changing email:', err);
+      setSecurityError(err.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deleteConfirmEmail) {
+      setSecurityError('Please enter your email to confirm');
+      return;
+    }
+
+    if (deleteConfirmEmail !== profileData.email) {
+      setSecurityError('Email does not match your account email');
+      return;
+    }
+
+    setIsProcessing(true);
+    setSecurityError('');
+
+    try {
+      const response = await fetch('/api/account/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete account');
+      }
+
+      alert(data.message);
+      // Redirect to home page after successful deletion
+      router.push('/');
+    } catch (err) {
+      console.error('Error deleting account:', err);
+      setSecurityError(err.message);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -638,9 +724,53 @@ useEffect(() => {
                 <p className="text-gray-600 mb-4">
                   Your account uses magic link authentication. We send a secure link to your email when you want to sign in.
                 </p>
-                <button className="btn btn-outline-primary">
+                <button 
+                  className="btn btn-outline-primary"
+                  onClick={() => setShowEmailChangeModal(true)}
+                >
                   Change Email Address
                 </button>
+
+                {showEmailChangeModal && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+                      <h4 className="text-lg font-medium mb-4">Change Email Address</h4>
+                      <p className="text-gray-600 mb-4">
+                        Enter your new email address. You'll need to verify it before the change takes effect.
+                      </p>
+                      <input
+                        type="email"
+                        className="form-control mb-4"
+                        value={newEmail}
+                        onChange={(e) => setNewEmail(e.target.value)}
+                        placeholder="New email address"
+                      />
+                      {securityError && (
+                        <p className="text-red-500 text-sm mb-4">{securityError}</p>
+                      )}
+                      <div className="flex justify-end space-x-3">
+                        <button
+                          className="btn btn-outline-secondary"
+                          onClick={() => {
+                            setShowEmailChangeModal(false);
+                            setNewEmail('');
+                            setSecurityError('');
+                          }}
+                          disabled={isProcessing}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          className="btn btn-primary"
+                          onClick={handleEmailChange}
+                          disabled={isProcessing}
+                        >
+                          {isProcessing ? 'Processing...' : 'Change Email'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               <hr className="border-gray-200" />
               <div>
@@ -648,9 +778,54 @@ useEffect(() => {
                 <p className="text-gray-600 mb-4">
                   Once you delete your account, there is no going back. Please be certain.
                 </p>
-                <button className="btn btn-danger">
+                <button 
+                  className="btn btn-danger"
+                  onClick={() => setShowDeleteConfirmModal(true)}
+                >
                   Delete Account
                 </button>
+
+                {showDeleteConfirmModal && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+                      <h4 className="text-lg font-medium mb-4">Delete Account</h4>
+                      <p className="text-gray-600 mb-4">
+                        This action cannot be undone. All your data will be permanently deleted.
+                        To confirm, please enter your email address: <strong>{profileData.email}</strong>
+                      </p>
+                      <input
+                        type="email"
+                        className="form-control mb-4"
+                        value={deleteConfirmEmail}
+                        onChange={(e) => setDeleteConfirmEmail(e.target.value)}
+                        placeholder="Confirm your email"
+                      />
+                      {securityError && (
+                        <p className="text-red-500 text-sm mb-4">{securityError}</p>
+                      )}
+                      <div className="flex justify-end space-x-3">
+                        <button
+                          className="btn btn-outline-secondary"
+                          onClick={() => {
+                            setShowDeleteConfirmModal(false);
+                            setDeleteConfirmEmail('');
+                            setSecurityError('');
+                          }}
+                          disabled={isProcessing}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          className="btn btn-danger"
+                          onClick={handleDeleteAccount}
+                          disabled={isProcessing}
+                        >
+                          {isProcessing ? 'Processing...' : 'Permanently Delete Account'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -1,4 +1,3 @@
-import { stripe } from '@/lib/stripe';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 
@@ -30,11 +29,17 @@ export async function POST(request) {
       }
     );
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { newEmail } = await request.json();
 
+    if (!newEmail) {
+      return NextResponse.json(
+        { error: 'New email is required' },
+        { status: 400 }
+      );
+    }
+
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -42,36 +47,25 @@ export async function POST(request) {
       );
     }
 
-    // Get user's subscription
-    const { data: subscription } = await supabase
-      .from('subscriptions')
-      .select('stripe_subscription_id')
-      .eq('user_id', user.id)
-      .single();
+    // Update email
+    const { error: updateError } = await supabase.auth.updateUser({
+      email: newEmail
+    });
 
-    if (!subscription?.stripe_subscription_id) {
+    if (updateError) {
       return NextResponse.json(
-        { error: 'No active subscription found' },
-        { status: 404 }
+        { error: updateError.message },
+        { status: 400 }
       );
     }
 
-    // Cancel the subscription at period end
-    await stripe.subscriptions.update(subscription.stripe_subscription_id, {
-      cancel_at_period_end: true,
+    return NextResponse.json({
+      success: true,
+      message: 'Email change confirmation sent. Please check your new email and click the link to confirm the change.'
     });
 
-    // Update subscription status in database
-    await supabase
-      .from('subscriptions')
-      .update({
-        status: 'canceled'
-      })
-      .eq('stripe_subscription_id', subscription.stripe_subscription_id);
-
-    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error changing email:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

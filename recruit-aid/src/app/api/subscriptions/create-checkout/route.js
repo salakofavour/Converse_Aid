@@ -1,43 +1,45 @@
 import { stripe } from '@/lib/stripe';
 import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 const PRICE_ID = process.env.STRIPE_PRICE_ID;
 
-export async function POST() {
+export async function POST(request) {
   try {
-    const cookieStore = await cookies();
+    // Verify CSRF protection
+    const requestedWith = request.headers.get('x-requested-with');
+    if (!requestedWith || requestedWith !== 'XMLHttpRequest') {
+      return NextResponse.json(
+        { error: 'Invalid request' },
+        { status: 403 }
+      );
+    }
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       {
         cookies: {
-          async getAll() {
-            return cookieStore.getAll();
+          getAll() {
+            return request.cookies.getAll();
           },
-          async setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // The `setAll` method was called from a Server Component.
-              // This can be ignored if you have middleware refreshing
-              // user sessions.
-            }
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              request.cookies.set(name, value, options)
+            );
           },
         },
       }
     );
 
-    // Get user session
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
       return NextResponse.json(
-        { error: 'Not authenticated' },
+        { error: 'Unauthorized' },
         { status: 401 }
       );
     }
@@ -46,7 +48,7 @@ export async function POST() {
     const { data: existingSubscription } = await supabase
       .from('subscriptions')
       .select('status')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .single();
 
     if (existingSubscription?.status === 'active' || existingSubscription?.status === 'trialing') {
@@ -62,9 +64,9 @@ export async function POST() {
       stripeCustomerId = existingSubscription.stripe_customer_id;
     } else {
       const customer = await stripe.customers.create({
-        email: session.user.email,
+        email: user.email,
         metadata: {
-          supabase_user_id: session.user.id
+          supabase_user_id: user.id
         }
       });
       stripeCustomerId = customer.id;
@@ -76,7 +78,7 @@ export async function POST() {
       items: [{ price: PRICE_ID }],
       trial_period_days: 14,
       metadata: {
-        supabase_user_id: session.user.id
+        supabase_user_id: user.id
       }
     });
 
@@ -95,12 +97,12 @@ export async function POST() {
           trial_end: trialEnd.toISOString(),
           subscription_end: new Date(subscription.current_period_end * 1000).toISOString()
         })
-        .eq('user_id', session.user.id);
+        .eq('user_id', user.id);
     } else {
       await supabase
         .from('subscriptions')
         .insert({
-          user_id: session.user.id,
+          user_id: user.id,
           stripe_customer_id: stripeCustomerId,
           stripe_subscription_id: subscription.id,
           status: 'trialing',
@@ -110,18 +112,28 @@ export async function POST() {
         });
     }
 
+    // Create a Stripe checkout session for payment method setup
+    const session = await stripe.checkout.sessions.create({
+      customer: stripeCustomerId,
+      mode: 'setup',
+      payment_method_types: ['card'],
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings/subscription?setup_success=true`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings/subscription?setup_canceled=true`,
+    });
+
     return NextResponse.json({ 
       success: true,
       subscription: {
         id: subscription.id,
         status: 'trialing',
         trial_end: trialEnd.toISOString()
-      }
+      },
+      url: session.url // Include the checkout URL for payment method setup
     });
   } catch (error) {
-    console.error('Error creating subscription:', error);
+    console.error('Error:', error);
     return NextResponse.json(
-      { error: 'Failed to create subscription' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

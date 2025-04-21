@@ -1,8 +1,10 @@
 'use client';
 
+import { CancellationWarningModal } from '@/components/modals/CancellationWarningModal';
 import { createBrowserClient } from '@supabase/ssr';
 import { redirect, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { toast } from 'react-hot-toast';
 
 export default function SubscriptionPage() {
   const [loading, setLoading] = useState(true);
@@ -10,6 +12,7 @@ export default function SubscriptionPage() {
   const [subscriptionData, setSubscriptionData] = useState(null);
   const [jobCount, setJobCount] = useState(0);
   const [user, setUser] = useState(null);
+  const [showCancellationWarning, setShowCancellationWarning] = useState(false);
   const router = useRouter();
 
   const supabase = createBrowserClient(
@@ -17,16 +20,35 @@ export default function SubscriptionPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   );
 
+  // Handle Stripe redirect results
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get('setup_success') === 'true') {
+      toast.success('Payment method setup successful');
+      // Remove the query parameters
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (searchParams.get('setup_canceled') === 'true') {
+      toast.info('Payment method setup cancelled');
+      // Remove the query parameters
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  // Load subscription data
   useEffect(() => {
     async function loadData() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          router.push('/login');
-          return;
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          return {
+            redirect: {
+              destination: '/signin',
+              permanent: false,
+            },
+          };
         }
 
-        setUser(session.user);
+        setUser(user);
 
         // Get subscription status and job count
         const { data: subscription } = await supabase
@@ -38,14 +60,14 @@ export default function SubscriptionPage() {
             subscription_end,
             stripe_customer_id
           `)
-          .eq('user_id', session.user.id)
+          .eq('user_id', user.id)
           .single();
 
         // Get job count
         const { count: jobCountData } = await supabase
           .from('jobs')
           .select('*', { count: 'exact', head: true })
-          .eq('user_id', session.user.id);
+          .eq('user_id', user.id);
 
         if (!subscription && !jobCountData) {
           redirect('/dashboard');
@@ -63,6 +85,81 @@ export default function SubscriptionPage() {
 
     loadData();
   }, []);
+
+  const handleSubscriptionAction = async (action) => {
+    if (action === 'cancel' && jobCount > 5) {
+      setShowCancellationWarning(true);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/subscriptions/${action}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'same-origin'
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || `Failed to ${action} subscription`);
+      }
+
+      // Handle successful response
+      if (data.url) {
+        // If we have a URL, redirect to Stripe
+        window.location.href = data.url;
+      } else if (data.success) {
+        // If successful but no URL (e.g., cancellation), refresh the page
+        toast.success(action === 'cancel' ? 'Subscription cancelled' : 'Trial started successfully');
+        router.refresh();
+      }
+    } catch (err) {
+      console.error(`Error ${action}ing subscription:`, err);
+      toast.error(`Failed to ${action} subscription`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBillingPortal = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/subscriptions/portal', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'same-origin'
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to access billing portal');
+      }
+
+      // Redirect to Stripe Portal
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (err) {
+      console.error('Error accessing billing portal:', err);
+      toast.error('Failed to access billing portal');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancellationConfirm = () => {
+    setShowCancellationWarning(false);
+    handleSubscriptionAction('cancel');
+  };
 
   if (loading) {
     return (
@@ -95,33 +192,15 @@ export default function SubscriptionPage() {
     daysRemaining = Math.ceil((subscriptionEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   }
 
-  const handleSubscriptionAction = async (action) => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/subscriptions/${action}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to process subscription action');
-      }
-
-      router.refresh();
-    } catch (err) {
-      console.error(`Error ${action}ing subscription:`, err);
-      setError(`Failed to ${action} subscription`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
+      <CancellationWarningModal 
+        isOpen={showCancellationWarning}
+        onClose={() => setShowCancellationWarning(false)}
+        onConfirm={handleCancellationConfirm}
+        jobCount={jobCount}
+      />
+
       <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h1 className="text-3xl font-bold">Choose Your Plan</h1>
@@ -155,6 +234,10 @@ export default function SubscriptionPage() {
               </li>
               <li className="flex items-center">
                 <span className="mr-3 text-green-500">✓</span>
+                Priority Support
+              </li>
+              <li className="flex items-center">
+                <span className="mr-3 text-green-500">✓</span>
                 All features included
               </li>
               {isTrialing && trialEnd && (
@@ -175,33 +258,29 @@ export default function SubscriptionPage() {
         {/* Action Button */}
         <div className="text-center mb-12">
           {isSubscribed ? (
-            <form action="/api/subscriptions/cancel" method="POST" className="inline-block">
-              <button 
-                type="submit"
-                className="px-8 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                disabled={loading}
-              >
-                Cancel Subscription
-              </button>
-            </form>
+            <button 
+              onClick={() => handleSubscriptionAction('cancel')}
+              className="px-8 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              disabled={loading}
+            >
+              {loading ? 'Processing...' : 'Cancel Subscription'}
+            </button>
           ) : (
-            <form action="/api/subscriptions/create-checkout" method="POST" className="inline-block">
-              <button 
-                type="submit"
-                className="px-8 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
-                disabled={loading}
-              >
-                {isTrialing ? 'Upgrade to Pro' : 'Start 14-Day Free Trial'}
-              </button>
-            </form>
+            <button 
+              onClick={() => handleSubscriptionAction('create-checkout')}
+              className="px-8 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+              disabled={loading}
+            >
+              {loading ? 'Processing...' : (isTrialing ? 'Upgrade to Pro' : 'Start 14-Day Free Trial')}
+            </button>
           )}
           {hasStripeAccount && (
             <button
               className="ml-4 px-8 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              onClick={() => window.open('https://billing.stripe.com/p/login/test', '_blank')}
+              onClick={handleBillingPortal}
               disabled={loading}
             >
-              Manage Billing
+              {loading ? 'Loading...' : 'Manage Billing'}
             </button>
           )}
         </div>

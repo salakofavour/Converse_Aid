@@ -1,10 +1,13 @@
 'use client';
 
+import { JobLimitModal } from '@/components/modals/JobLimitModal';
 import { deletePineconeNamespace } from '@/lib/pinecone';
-import { deleteJob, getApplicants, getJobs } from '@/lib/supabase';
+import { createClient, deleteJob, getApplicants, getJobs } from '@/lib/supabase';
 import { TrashIcon } from '@heroicons/react/24/outline';
+import * as Tooltip from '@radix-ui/react-tooltip';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 
 export default function ViewJobs() {
   const router = useRouter();
@@ -13,18 +16,29 @@ export default function ViewJobs() {
   const [error, setError] = useState(null);
   const [jobApplicants, setJobApplicants] = useState({});
   const [deletingJobs, setDeletingJobs] = useState(new Set()); // Track jobs being deleted
+  const [selectedActions, setSelectedActions] = useState({}); // Track selected action for each job
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
   
   // Load jobs data from Supabase
   useEffect(() => {
     async function loadJobs() {
       try {
         setIsLoading(true);
+        const supabase = createClient();
         const { jobs: jobsData, error: jobsError } = await getJobs();
         
         if (jobsError) {
           throw new Error(jobsError.message);
         }
         
+        // Get subscription status
+        const { data: subscription } = await supabase
+          .from('subscriptions')
+          .select('status')
+          .single();
+        
+        setIsSubscribed(subscription?.status === 'active' || subscription?.status === 'trialing');
         setJobs(jobsData || []);
 
         // Load applicant counts for each job
@@ -55,12 +69,66 @@ export default function ViewJobs() {
 
   // Handle creating a new job
   const handleCreateJob = () => {
-    router.push('/dashboard/create-job');
+    if (jobs.length >= 5) {
+      setShowLimitModal(true);
+    } else {
+      router.push('/dashboard/create-job');
+    }
   };
 
   // Handle clicking on a job card
   const handleJobClick = (jobId) => {
     router.push(`/dashboard/view-jobs/${jobId}`);
+  };
+
+  // Handle action selection
+  const handleActionSelect = (jobId, action) => {
+    setSelectedActions(prev => ({
+      ...prev,
+      [jobId]: action
+    }));
+  };
+
+  // Handle action button click
+  const handleActionClick = async (e, jobId) => {
+    e.stopPropagation(); // Prevent job card click
+    const selectedAction = selectedActions[jobId];
+    
+    if (!selectedAction) return;
+
+    try {
+      const response = await fetch('/api/update-agent-state', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-requested-with': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+          jobId,
+          action: selectedAction
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update job state');
+      }
+
+      // Show success toast and refresh jobs
+      toast.success('Job state updated successfully');
+      const { jobs: updatedJobs, error: jobsError } = await getJobs();
+      
+      if (jobsError) {
+        throw new Error(jobsError.message);
+      }
+      
+      setJobs(updatedJobs || []);
+
+    } catch (error) {
+      console.error('Error updating job state:', error);
+      toast.error(error.message || 'Failed to update job state');
+    }
   };
 
   // Handle job deletion
@@ -119,6 +187,12 @@ export default function ViewJobs() {
           Create New Job
         </button>
       </div>
+
+      {/* Add JobLimitModal */}
+      <JobLimitModal 
+        isOpen={showLimitModal} 
+        onClose={() => setShowLimitModal(false)} 
+      />
 
       <div className="bg-white rounded-lg shadow-custom p-6 transition-all hover:shadow-lg">
         {error && (
@@ -182,19 +256,26 @@ export default function ViewJobs() {
                 <div className="p-5">
                   <div className="flex justify-between items-start mb-4">
                     <h2 className="text-lg font-semibold text-gray-900 line-clamp-2">{job.title}</h2>
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                      job.status === 'active' 
-                        ? 'bg-green-100 text-green-800' 
-                        : job.status === 'scheduled'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {job.status === 'active' 
-                        ? 'Active' 
-                        : job.status === 'scheduled' 
-                          ? 'Scheduled' 
+                    <div className="flex items-center space-x-2">
+                      {job.agent_state && (
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          job.agent_state === 'running' ? 'bg-green-100 text-green-800' :
+                          job.agent_state === 'stopped' ? 'bg-red-100 text-red-800' :
+                          job.agent_state === 'paused' ? 'bg-gray-100 text-gray-800' : ''
+                        }`}>
+                          {job.agent_state}
+                        </span>
+                      )}
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                        new Date() <= new Date(job.flow_end_date)
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {new Date() <= new Date(job.flow_end_date)
+                          ? 'Active'
                           : 'Closed'}
-                    </span>
+                      </span>
+                    </div>
                   </div>
                   
                   <div className="space-y-2 mb-4">
@@ -225,6 +306,67 @@ export default function ViewJobs() {
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
+                    </div>
+                  </div>
+
+                  {/* Action Controls */}
+                  <div className="mt-4" onClick={e => e.stopPropagation()}>
+                    <div className="flex justify-end space-x-2">
+                      <div className="relative w-48">
+                        <select
+                          className={`form-select w-full focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-all
+                            ${!isSubscribed || new Date() > new Date(job.flow_end_date)
+                              ? 'bg-gray-100 cursor-not-allowed opacity-60'
+                              : 'hover:border-gray-400'
+                            }`}
+                          value={selectedActions[job.id] || ''}
+                          onChange={(e) => handleActionSelect(job.id, e.target.value)}
+                          disabled={new Date() > new Date(job.flow_end_date) || !isSubscribed}
+                        >
+                          <option value="">Choose an action</option>
+                          <option value="Start">Start</option>
+                          <option value="Stop">Stop</option>
+                          <option value="Pause">Pause</option>
+                          <option value="Resume">Resume</option>
+                        </select>
+                        {(!isSubscribed || new Date() > new Date(job.flow_end_date)) && (
+                          <div className="absolute top-1/2 -translate-y-1/2 right-8">
+                            <Tooltip.Provider>
+                              <Tooltip.Root>
+                                <Tooltip.Trigger asChild>
+                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-400 cursor-help">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                                  </svg>
+                                </Tooltip.Trigger>
+                                <Tooltip.Portal>
+                                  <Tooltip.Content
+                                    className="rounded-lg bg-gray-900 px-4 py-2 text-sm leading-tight text-white shadow-lg"
+                                    sideOffset={5}
+                                  >
+                                    {!isSubscribed
+                                      ? "Upgrade to Pro to manage job actions"
+                                      : "Cannot modify actions for expired jobs"}
+                                    <Tooltip.Arrow className="fill-gray-900" />
+                                  </Tooltip.Content>
+                                </Tooltip.Portal>
+                              </Tooltip.Root>
+                            </Tooltip.Provider>
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        className={`btn px-4 py-2 transition-all
+                          ${!selectedActions[job.id] || new Date() > new Date(job.flow_end_date) || !isSubscribed
+                            ? 'btn-secondary bg-gray-100 cursor-not-allowed opacity-60'
+                            : 'btn-primary hover:bg-primary-dark'
+                          }`}
+                        onClick={(e) => handleActionClick(e, job.id)}
+                        disabled={!selectedActions[job.id] || new Date() > new Date(job.flow_end_date) || !isSubscribed}
+                      >
+                        Go
+                      </button>
                     </div>
                   </div>
                 </div>

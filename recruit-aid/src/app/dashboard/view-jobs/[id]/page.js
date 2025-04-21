@@ -84,8 +84,8 @@ export default function JobDetail() {
     return text.split('\n').filter(line => line.trim() !== '').map(line => line.trim());
   };
 
-  // Check if job can be edited (active or scheduled)
-  const canEdit = job && (job.status === 'active' || job.status === 'scheduled');
+  // Check if job can be edited (not closed)
+  const canEdit = job && (new Date() <= new Date(job.flow_end_date));
   
   if (isLoading) {
     return (
@@ -173,17 +173,13 @@ export default function JobDetail() {
           <div className="flex justify-between items-start mb-4">
             <h2 className="text-xl font-bold text-gray-900">{job.title}</h2>
             <span className={`px-3 py-1 text-sm font-semibold rounded-full ${
-              job.status === 'active' 
-                ? 'bg-green-100 text-green-800' 
-                : job.status === 'scheduled'
-                  ? 'bg-blue-100 text-blue-800'
-                  : 'bg-gray-100 text-gray-800'
+              new Date() <= new Date(job.flow_end_date)
+                ? 'bg-green-100 text-green-800'
+                : 'bg-red-100 text-red-800'
             }`}>
-              {job.status === 'active' 
-                ? 'Active' 
-                : job.status === 'scheduled' 
-                  ? 'Scheduled' 
-                  : 'Closed'}
+              {new Date() <= new Date(job.flow_end_date)
+                ? 'Active'
+                : 'Closed'}
             </span>
           </div>
           

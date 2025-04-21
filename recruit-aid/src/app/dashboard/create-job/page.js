@@ -7,7 +7,7 @@ export default function CreateJob() {
   const router = useRouter();
   
   useEffect(() => {
-    router.replace('/dashboard/view-jobs');
+    router.replace('/dashboard/create-job/template');
   }, [router]);
 
   return null;

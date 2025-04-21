@@ -54,18 +54,10 @@ export default function JobSummary() {
     setError(null);
     
     try {
-      // Determine status based on dates
+      // Determine status based on end date only
       const currentDate = new Date();
-      const startDate = new Date(jobData.flowStartDate);
       const endDate = new Date(jobData.flowEndDate);
-      
-      let status = 'active';
-      
-      if (currentDate < startDate) {
-        status = 'scheduled';
-      } else if (currentDate > endDate) {
-        status = 'closed';
-      }
+      const status = currentDate <= endDate ? 'active' : 'closed';
       
       // Prepare job data for submission
       const supabaseJobData = {
@@ -80,8 +72,7 @@ export default function JobSummary() {
         responsibilities: jobData.responsibilities,
         qualifications: jobData.qualifications,
         Job_email: jobData.senderEmail,
-        status: status,
-        status_manually_set: false
+        status: status
       };
       
       // Save to Supabase

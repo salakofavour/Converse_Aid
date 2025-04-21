@@ -1,14 +1,14 @@
 'use client';
 
-import { getJobs, getUser, initializeUserProfile } from '@/lib/supabase';
+import { getJobs, getProfile, getUser, initializeUserProfile } from '@/lib/supabase';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [stats, setStats] = useState({
     activeJobs: 0,
-    scheduledJobs: 0,
     closedJobs: 0,
     totalJobs: 0,
     recentActivity: []
@@ -22,6 +22,10 @@ export default function Dashboard() {
       if (userData) {
         setUser(userData);
         
+        // Get profile data
+        const { profile: profileData } = await getProfile();
+        setProfile(profileData);
+        
         // Initialize user profile if it doesn't exist
         await initializeUserProfile();
       }
@@ -32,16 +36,10 @@ export default function Dashboard() {
       if (jobs) {
         const currentDate = new Date();
         
-        // Calculate job counts based on date criteria
+        // Calculate job counts based on end date only
         const activeJobsCount = jobs.filter(job => {
-          const startDate = new Date(job.flow_start_date);
           const endDate = new Date(job.flow_end_date);
-          return currentDate >= startDate && currentDate <= endDate;
-        }).length;
-        
-        const scheduledJobsCount = jobs.filter(job => {
-          const startDate = new Date(job.flow_start_date);
-          return currentDate < startDate;
+          return currentDate <= endDate;
         }).length;
         
         const closedJobsCount = jobs.filter(job => {
@@ -52,7 +50,6 @@ export default function Dashboard() {
         // Set the stats with actual data
         setStats({
           activeJobs: activeJobsCount,
-          scheduledJobs: scheduledJobsCount,
           closedJobs: closedJobsCount,
           totalJobs: jobs.length,
           recentActivity: [
@@ -66,7 +63,6 @@ export default function Dashboard() {
         // Set default values in case of error
         setStats({
           activeJobs: 0,
-          scheduledJobs: 0,
           closedJobs: 0,
           totalJobs: 0,
           recentActivity: []
@@ -77,8 +73,8 @@ export default function Dashboard() {
     loadData();
   }, []);
 
-  // Extract user's name from email if available
-  const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'there';
+  // Get user's name from profile first, then metadata, then email
+  const userName = profile?.name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'there';
 
   return (
     <div className="space-y-6">
@@ -90,7 +86,7 @@ export default function Dashboard() {
       </div>
 
       {/* Job Stats Section - 30% of screen height */}
-      <div className="h-[30vh] grid grid-cols-4 gap-4">
+      <div className="h-[30vh] grid grid-cols-3 gap-4">
         {/* View Jobs Box */}
         <Link 
           href="/dashboard/view-jobs" 
@@ -109,12 +105,6 @@ export default function Dashboard() {
         <div className="bg-white rounded-lg shadow-custom p-6 flex flex-col items-center justify-center">
           <h3 className="text-gray-500 text-sm font-medium mb-3">Active Jobs</h3>
           <div className="text-3xl font-bold text-gray-900">{stats.activeJobs}</div>
-        </div>
-
-        {/* Scheduled Jobs Box */}
-        <div className="bg-white rounded-lg shadow-custom p-6 flex flex-col items-center justify-center">
-          <h3 className="text-gray-500 text-sm font-medium mb-3">Scheduled Jobs</h3>
-          <div className="text-3xl font-bold text-gray-900">{stats.scheduledJobs}</div>
         </div>
 
         {/* Total Jobs Box */}
