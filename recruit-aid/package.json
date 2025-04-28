@@ -1,8 +1,8 @@
 {
-  "name": "recruit-aid",
+  "name": "converse-aid",
   "version": "0.1.0",
   "private": true,
-  "description": "A recruiting tool for easier and more efficient communication with job applicants",
+  "description": "A conversational AI tool that allows users to create Agents for easier and more efficient communication with job members via GMail",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",

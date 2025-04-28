@@ -27,7 +27,7 @@ export default function Navbar({ user }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-8">
             <Link href="/dashboard" className="text-2xl font-bold text-primary hover:text-primary-dark transition-colors">
-              RecruitAid
+              Converse-Aid
             </Link>
             
             {/* Desktop Navigation */}

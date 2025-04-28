@@ -1,6 +1,6 @@
-# Supabase Setup for RecruitAid
+# Supabase Setup for Converse-Aid
 
-This directory contains SQL migrations for setting up the Supabase database for RecruitAid.
+This directory contains SQL migrations for setting up the Supabase database for Converse-Aid.
 
 ## Setting Up the Jobs Table
 
@@ -37,7 +37,7 @@ The `jobs` table has the following structure:
 | flow_end_date    | DATE                    | Recruitment flow end date                  |
 | responsibilities | TEXT                    | Job responsibilities                       |
 | qualifications     | TEXT                    | Job qualifications                           |
-| applicants       | JSONB                   | Array of applicant objects                 |
+| members       | JSONB                   | Array of applicant objects                 |
 | status           | TEXT                    | Job status (active, scheduled, closed)     |
 | created_at       | TIMESTAMP WITH TIME ZONE| Creation timestamp                         |
 | updated_at       | TIMESTAMP WITH TIME ZONE| Last update timestamp                      |

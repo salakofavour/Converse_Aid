@@ -51,7 +51,7 @@ export default function SignUp() {
       <nav className="bg-white shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <Link href="/" className="text-2xl font-bold text-primary">
-            RecruitAid
+            Converse-Aid
           </Link>
         </div>
       </nav>
@@ -130,7 +130,7 @@ export default function SignUp() {
       {/* Footer */}
       <footer className="bg-white py-4 border-t border-gray-200">
         <div className="container mx-auto px-4 text-center text-gray-600 text-sm">
-          © {new Date().getFullYear()} RecruitAid. All rights reserved.
+          © {new Date().getFullYear()} Converse-Aid. All rights reserved.
         </div>
       </footer>
     </div>

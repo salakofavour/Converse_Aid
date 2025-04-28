@@ -1,7 +1,7 @@
-import { createApplicant, deleteApplicant, getApplicants, updateApplicant } from '@/lib/applicants';
+import { createMember, deleteMember, getMembers, updateMember } from '@/lib/supabase';
 import { NextResponse } from 'next/server';
 
-// Get all applicants for a job
+// Get all members for a job
 export async function GET(request) {
   try {
     // Verify CSRF protection
@@ -24,9 +24,9 @@ export async function GET(request) {
       );
     }
 
-    // Get applicants
-    const result = await getApplicants(jobId);
-    if (!result.success) {
+    // Get members
+    const result = await getMembers(jobId);
+    if (result.error) {
       return NextResponse.json(
         { error: result.error },
         { status: 400 }
@@ -35,7 +35,7 @@ export async function GET(request) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error in applicants GET route:', error);
+    console.error('Error in members GET route:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -43,7 +43,7 @@ export async function GET(request) {
   }
 }
 
-// Create a new applicant
+// Create a new member
 export async function POST(request) {
   try {
     // Verify CSRF protection
@@ -55,7 +55,7 @@ export async function POST(request) {
       );
     }
 
-    const { jobId, ...applicantData } = await request.json();
+    const { jobId, ...memberData } = await request.json();
 
     if (!jobId) {
       return NextResponse.json(
@@ -64,9 +64,9 @@ export async function POST(request) {
       );
     }
 
-    // Create applicant
-    const result = await createApplicant(jobId, applicantData);
-    if (!result.success) {
+    // Create member
+    const result = await createMember(jobId, memberData);
+    if (result.error) {
       return NextResponse.json(
         { error: result.error },
         { status: 400 }
@@ -75,7 +75,7 @@ export async function POST(request) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error in applicants POST route:', error);
+    console.error('Error in members POST route:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -83,7 +83,7 @@ export async function POST(request) {
   }
 }
 
-// Update an applicant
+// Update a member
 export async function PUT(request) {
   try {
     // Verify CSRF protection
@@ -96,20 +96,20 @@ export async function PUT(request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const applicantId = searchParams.get('id');
+    const memberId = searchParams.get('id');
 
-    if (!applicantId) {
+    if (!memberId) {
       return NextResponse.json(
-        { error: 'Applicant ID is required' },
+        { error: 'Member ID is required' },
         { status: 400 }
       );
     }
 
-    const applicantData = await request.json();
+    const memberData = await request.json();
 
-    // Update applicant
-    const result = await updateApplicant(applicantId, applicantData);
-    if (!result.success) {
+    // Update member
+    const result = await updateMember(memberId, memberData);
+    if (result.error) {
       return NextResponse.json(
         { error: result.error },
         { status: 400 }
@@ -118,7 +118,7 @@ export async function PUT(request) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error in applicants PUT route:', error);
+    console.error('Error in members PUT route:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -126,7 +126,7 @@ export async function PUT(request) {
   }
 }
 
-// Delete an applicant
+// Delete a member
 export async function DELETE(request) {
   try {
     // Verify CSRF protection
@@ -139,18 +139,18 @@ export async function DELETE(request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const applicantId = searchParams.get('id');
+    const memberId = searchParams.get('id');
 
-    if (!applicantId) {
+    if (!memberId) {
       return NextResponse.json(
-        { error: 'Applicant ID is required' },
+        { error: 'Member ID is required' },
         { status: 400 }
       );
     }
 
-    // Delete applicant
-    const result = await deleteApplicant(applicantId);
-    if (!result.success) {
+    // Delete member
+    const result = await deleteMember(memberId);
+    if (result.error) {
       return NextResponse.json(
         { error: result.error },
         { status: 400 }
@@ -159,7 +159,7 @@ export async function DELETE(request) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error in applicants DELETE route:', error);
+    console.error('Error in members DELETE route:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -1,4 +1,4 @@
-import { updateApplicantMessageIds } from '@/lib/applicants';
+import { updateMemberMessageIds } from '@/lib/supabase';
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {
@@ -12,9 +12,9 @@ export async function POST(request) {
       );
     }
 
-    const { applicants } = await request.json();
+    const { members } = await request.json();
     
-    if (!applicants || !Array.isArray(applicants)) {
+    if (!members || !Array.isArray(members)) {
       return NextResponse.json(
         { error: 'Invalid request format' },
         { status: 400 }
@@ -22,8 +22,8 @@ export async function POST(request) {
     }
 
     // Update message IDs
-    const result = await updateApplicantMessageIds(applicants);
-    if (!result.success) {
+    const result = await updateMemberMessageIds(members);
+    if (result.error) {
       return NextResponse.json(
         { error: result.error },
         { status: 400 }
@@ -32,7 +32,7 @@ export async function POST(request) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error in applicant message IDs update route:', error);
+    console.error('Error in member message IDs update route:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

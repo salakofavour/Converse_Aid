@@ -167,13 +167,13 @@ class EmailService:
             raise
 
     @retry_with_backoff() 
-    def send_first_message(self, job_id: str, applicant: Dict[str, Any]) -> Dict[str, Any]:
+    def send_first_message(self, job_id: str, member: Dict[str, Any]) -> Dict[str, Any]:
         """
         Send a default message to start the email thread.
         
         Args:
             job_id: Job ID
-            applicant: The details of the applicant
+            member: The details of the member
             
         return:
             API response dictionary
@@ -199,10 +199,10 @@ class EmailService:
             
             subject = job_details.get('subject', 'Subject')
             message = job_details.get('default_message', '')
-            applicant_name = applicant["name_email"]["name"]
-            body = message.replace('{{applicant_name}}', applicant_name)
+            member_name = member["name_email"]["name"]
+            body = message.replace('{{member_name}}', member_name)
 
-            To = applicant["name_email"]["email"]
+            To = member["name_email"]["email"]
             From = job_details.get('Job_email')
             
             # Create email message
@@ -242,13 +242,13 @@ class EmailService:
             raise
 
     @retry_with_backoff()
-    def send_reply(self, job_id: str, applicant_id: str, reply_params: Dict[str, Any]) -> Dict[str, Any]:
+    def send_reply(self, job_id: str, member_id: str, reply_params: Dict[str, Any]) -> Dict[str, Any]:
         """
         Send a reply to an email thread.
         
         Args:
             job_id: Job ID
-            applicant_id: The ID of the applicant
+            member_id: The ID of the member
             reply_params: Dict with reply parameters (to, body, thread_id, etc.)
             
         return:
@@ -270,7 +270,7 @@ class EmailService:
             # Create email message
             message = EmailMessage()
             message.set_content(reply_params.get('body', ''))
-            message["To"] = reply_params.get('to')  # Should be applicant's email
+            message["To"] = reply_params.get('to')  # Should be member's email
             message["From"] = reply_params.get('from', token_info['job_email'])
             message["Subject"] = reply_params.get('subject', '')
             
@@ -311,14 +311,14 @@ class EmailService:
         except Exception as e:
             raise
     
-    def check_for_new_emails(self, job_id: str, applicant_id: str, applicant_email: str) -> Dict[str, Any]:
+    def check_for_new_emails(self, job_id: str, member_id: str, member_email: str) -> Dict[str, Any]:
         """
-        Check for new emails from a specific applicant.
+        Check for new emails from a specific member.
         
         Args:
             job_id: Job ID (needed for auth)
-            applicant_id: The ID of the applicant
-            applicant_email: The email address of the applicant
+            member_id: The ID of the member
+            member_email: The email address of the member
             
         return:
             Dict with status and message data if found
@@ -327,19 +327,19 @@ class EmailService:
             Various exceptions based on operations
         """
         try:
-            # Get applicant details for context
-            applicant = db.get_applicant_details(applicant_id)
+            # Get member details for context
+            member = db.get_member_details(member_id)
             
-            # # Build search query for this specific applicant
-            # subject = f"subject:{applicant.get('subject', '')}"
-            # from_email = f"from:{applicant_email}"
+            # # Build search query for this specific member
+            # subject = f"subject:{member.get('subject', '')}"
+            # from_email = f"from:{member_email}"
             # search_query = f"{subject} {from_email}" #  eventually I wiill use this implementation along with the start date
             # # search_query = f"subject:Newest Test {from_email}" #previously partly haedcoded
             # # Search for matching emails
             # messages = self.search_emails(job_id, search_query)
             
             # if not messages:
-            #     return {"status": "no_emails", "message": f"No emails found from {applicant_email}"}
+            #     return {"status": "no_emails", "message": f"No emails found from {member_email}"}
             
             # # Get the latest message's thread
             # latest_message = messages[0]
@@ -349,18 +349,18 @@ class EmailService:
             # #the check is dumb because it checks if the thread is the same as what we processed before
             
             # # Check if this is the same thread we've processed before
-            # if applicant.get("thread_id") == thread_id and applicant.get("overall_message_id") == latest_message.get("id"):
+            # if member.get("thread_id") == thread_id and member.get("overall_message_id") == latest_message.get("id"):
             #     return {
             #         "status": "no_new_messages", 
             #         "message": "No new messages in the thread since last check"
             #     }
-            thread_id = applicant.get("thread_id")
+            thread_id = member.get("thread_id")
             if not thread_id:
-                # raise ValueError("Thread ID not found in applicant record, ensure the user has sent at least one email to the applicant")
-                print("Thread ID not found in applicant record, we will send the initial message")
+                # raise ValueError("Thread ID not found in member record, ensure the user has sent at least one email to the member")
+                print("Thread ID not found in member record, we will send the initial message")
                 return {
                 "status": "no initial message",
-                "message": "No initial message sent to the applicant"
+                "message": "No initial message sent to the member"
                 }
             # Get the full thread
             thread = self.get_thread(job_id, thread_id)
@@ -372,23 +372,23 @@ class EmailService:
             # Extract the last message's data
             message_data = self.extract_message_data(last_message)
 
-            # Check if we've already processed this message(or it's from the user/agent. We only want to proceed with processing messages from the applicants)
-            if applicant.get("message_id") == message_data.get("message_id"):
+            # Check if we've already processed this message(or it's from the user/agent. We only want to proceed with processing messages from the members)
+            if member.get("message_id") == message_data.get("message_id"):
                 return {
                     "status": "no_new_messages", 
                     "message": "No new messages in the thread since last check"
                 }
             
             
-            # Update email details in applicant record ->  this is just to supply the body of the applicants response 
+            # Update email details in member record ->  this is just to supply the body of the members response 
             # to the vector search, it annoys me a bit i need to call a db operation just for one variable
             #but that is how needed it is for now. I wont update the body after a reply, as that is not needed
-            # I only need the body from an applicants reply
+            # I only need the body from an members reply
             email_details = {
                 "body": message_data["body"]
             }
             
-            db.update_applicant_details(applicant_id, email_details)
+            db.update_member_details(member_id, email_details)
             
             return {
                 "status": "new_message",
@@ -401,13 +401,13 @@ class EmailService:
 
     @retry_with_backoff() #implementation to send user a notification email I cannot use the email from here to send important/error email. like the refresh_token error, if that is wrong the email sending will also be wrong so wont send
     #of cousrse i can, the refresh_token and all that is when i want to use the user's email to perform actions. In this I am using the business's email to send emails
-    def send_user_notification_email(self, message: str, applicant_id: str="", job_id: str="", isJob: bool=False) -> Dict[str, Any]:
+    def send_user_notification_email(self, message: str, member_id: str="", job_id: str="", isJob: bool=False) -> Dict[str, Any]:
         """
         Send a notification email to the user.
         
         Args:
             message: The message to send to the user
-            applicant_id: The ID of the applicant
+            member_id: The ID of the member
             job_id: The ID of the job
             isJob: Whether the message is a job message
         return:
@@ -417,13 +417,13 @@ class EmailService:
             ConnectionError: If Resend request fails
         """
         try:
-            applicant_details = db.get_applicant_details(applicant_id)
+            member_details = db.get_member_details(member_id)
             job_details = db.get_job_details(job_id)
 
             if isJob:
                 email_message = message
             else:
-                email_message = message.format(applicant_email=applicant_details["name_email"]["email"], subject_title=applicant_details["subject"])
+                email_message = message.format(member_email=member_details["name_email"]["email"], subject_title=member_details["subject"])
 
             subject = "Urgent Message from Converse",
             body = email_message

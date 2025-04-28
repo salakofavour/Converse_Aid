@@ -2,7 +2,7 @@
 
 import { JobLimitModal } from '@/components/modals/JobLimitModal';
 import { deletePineconeNamespace } from '@/lib/pinecone';
-import { createClient, deleteJob, getApplicants, getJobs } from '@/lib/supabase';
+import { createClient, deleteJob, getJobs, getMembers } from '@/lib/supabase';
 import { TrashIcon } from '@heroicons/react/24/outline';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { useRouter } from 'next/navigation';
@@ -14,7 +14,7 @@ export default function ViewJobs() {
   const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [jobApplicants, setJobApplicants] = useState({});
+  const [jobMembers, setJobMembers] = useState({});
   const [deletingJobs, setDeletingJobs] = useState(new Set()); // Track jobs being deleted
   const [selectedActions, setSelectedActions] = useState({}); // Track selected action for each job
   const [showLimitModal, setShowLimitModal] = useState(false);
@@ -44,10 +44,10 @@ export default function ViewJobs() {
         // Load applicant counts for each job
         const applicantCounts = {};
         await Promise.all((jobsData || []).map(async (job) => {
-          const { applicants } = await getApplicants(job.id);
-          applicantCounts[job.id] = applicants?.length || 0;
+          const { members } = await getMembers(job.id);
+          applicantCounts[job.id] = members?.length || 0;
         }));
-        setJobApplicants(applicantCounts);
+        setJobMembers(applicantCounts);
 
       } catch (err) {
         console.error('Error loading jobs:', err);
@@ -158,7 +158,7 @@ export default function ViewJobs() {
 
       // Update local state
       setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
-      setJobApplicants(prev => {
+      setJobMembers(prev => {
         const updated = { ...prev };
         delete updated[jobId];
         return updated;
@@ -299,8 +299,8 @@ export default function ViewJobs() {
                     </div>
                     <div className="flex items-center">
                       <div className="text-sm text-gray-600 mr-3">
-                        <span className="font-medium">{jobApplicants[job.id] || 0}</span>
-                        <span className="ml-1">applicants</span>
+                        <span className="font-medium">{jobMembers[job.id] || 0}</span>
+                        <span className="ml-1">members</span>
                       </div>
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

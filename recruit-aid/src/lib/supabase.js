@@ -309,47 +309,47 @@ export async function updateSenderEmails(senderEmails) {
   return { profile: data, error };
 }
 
-// Applicants functions
-export async function createApplicant(jobId, applicantData) {
+// Members functions
+export async function createMember(jobId, memberData) {
   const supabase = createClient();
   
-  // Insert the applicant
+  // Insert the member
   const { data, error } = await supabase
-    .from('applicants')
+    .from('members')
     .insert({
       job_id: jobId,
       name_email: {
-        name: applicantData.name,
-        email: applicantData.email
+        name: memberData.name,
+        email: memberData.email
       }
     })
     .select()
     .single();
   
-  return { applicant: data, error };
+  return { member: data, error };
 }
 
-export async function getApplicants(jobId) {
+export async function getMembers(jobId) {
   const supabase = createClient();
   
-  // Get all applicants for the job
+  // Get all members for the job
   const { data, error } = await supabase
-    .from('applicants')
+    .from('members')
     .select('*')
     .eq('job_id', jobId)
     .order('created_at', { ascending: false });
   
-  return { applicants: data, error };
+  return { members: data, error };
 }
 
-export async function deleteApplicant(applicantId) {
+export async function deleteMember(memberId) {
   const supabase = createClient();
   
-  // Delete the applicant
+  // Delete the member
   const { error } = await supabase
-    .from('applicants')
+    .from('members')
     .delete()
-    .eq('id', applicantId);
+    .eq('id', memberId);
   
   return { error };
 }

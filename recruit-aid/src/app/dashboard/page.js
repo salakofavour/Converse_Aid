@@ -38,12 +38,12 @@ export default function Dashboard() {
         
         // Calculate job counts based on end date only
         const activeJobsCount = jobs.filter(job => {
-          const endDate = new Date(job.flow_end_date);
+          const endDate = new Date(job.job_end_date);
           return currentDate <= endDate;
         }).length;
         
         const closedJobsCount = jobs.filter(job => {
-          const endDate = new Date(job.flow_end_date);
+          const endDate = new Date(job.job_end_date);
           return currentDate > endDate;
         }).length;
         

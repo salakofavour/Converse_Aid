@@ -1,6 +1,6 @@
 'use client';
 
-import { createApplicant, deleteApplicant, getApplicants, getJobById, getProfile, updateJob } from '@/lib/supabase';
+import { createMember, getJobById, getMembers, getProfile, updateJob } from '@/lib/supabase';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -15,7 +15,7 @@ export default function EditJob() {
     about: '',
     moreDetails: '',
     status: 'active',
-    applicants: [],
+    members: [],
     Job_email: ''
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -24,12 +24,12 @@ export default function EditJob() {
   const [senderEmails, setSenderEmails] = useState([]);
   const [isLoadingSenderEmails, setIsLoadingSenderEmails] = useState(true);
   const [senderEmailError, setSenderEmailError] = useState('');
-  const [applicants, setApplicants] = useState([]);
-  const [applicantName, setApplicantName] = useState('');
-  const [applicantEmail, setApplicantEmail] = useState('');
+  const [members, setMembers] = useState([]);
+  const [memberName, setMemberName] = useState('');
+  const [memberEmail, setMemberEmail] = useState('');
   const [emailError, setEmailError] = useState('');
   const [showAddedMessage, setShowAddedMessage] = useState(false);
-  const [isLoadingApplicants, setIsLoadingApplicants] = useState(true);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(true);
   
   // Load job data from Supabase
   useEffect(() => {
@@ -74,7 +74,8 @@ export default function EditJob() {
           about: job.about || '',
           moreDetails: job.more_details || '',
           status: job.status || 'active',
-          Job_email: job.Job_email || ''
+          Job_email: job.Job_email || '',
+          members: job.members || []
         });
       } catch (err) {
         console.error('Error loading job:', err);
@@ -113,28 +114,28 @@ export default function EditJob() {
     loadSenderEmails();
   }, []);
   
-  // Load applicants
+  // Load members
   useEffect(() => {
-    async function loadApplicants() {
+    async function loadMembers() {
       if (!params.id) return;
       
       try {
-        setIsLoadingApplicants(true);
-        const { applicants: applicantsData, error } = await getApplicants(params.id);
+        setIsLoadingMembers(true);
+        const { members: membersData, error } = await getMembers(params.id);
         
         if (error) {
-          console.error('Error loading applicants:', error);
+          console.error('Error loading members:', error);
         } else {
-          setApplicants(applicantsData || []);
+          setMembers(membersData || []);
         }
       } catch (err) {
-        console.error('Error loading applicants:', err);
+        console.error('Error loading members:', err);
       } finally {
-        setIsLoadingApplicants(false);
+        setIsLoadingMembers(false);
       }
     }
     
-    loadApplicants();
+    loadMembers();
   }, [params.id]);
   
   // Handle input changes
@@ -158,7 +159,8 @@ export default function EditJob() {
         about: formData.about,
         more_details: formData.moreDetails,
         Job_email: formData.Job_email,
-        status: formData.status
+        status: formData.status,
+        // members: formData.members
       };
 
       const { error: updateError } = await updateJob(params.id, jobData);
@@ -180,26 +182,26 @@ export default function EditJob() {
     return re.test(email);
   };
   
-  // Handle adding an applicant
-  const handleAddApplicant = async () => {
+  // Handle adding a member
+  const handleAddMember = async () => {
     // Reset error state
     setEmailError('');
     
     // Validate inputs
-    if (!applicantName.trim()) {
+    if (!memberName.trim()) {
       return; // Don't add if name is empty
     }
     
-    if (!validateEmail(applicantEmail)) {
+    if (!validateEmail(memberEmail)) {
       setEmailError('Invalid email format');
       return;
     }
     
     try {
-      // Add to applicants list
-      const { applicant, error } = await createApplicant(params.id, {
-        name: applicantName.trim(),
-        email: applicantEmail.trim()
+      // Add to members list
+      const { member, error } = await createMember(params.id, {
+        name: memberName.trim(),
+        email: memberEmail.trim()
       });
       
       if (error) {
@@ -207,7 +209,7 @@ export default function EditJob() {
       }
       
       // Update local state
-      setApplicants(prev => [applicant, ...prev]);
+      setMembers(prev => [member, ...prev]);
       
       // Show success message briefly
       setShowAddedMessage(true);
@@ -216,30 +218,30 @@ export default function EditJob() {
       }, 2000);
       
       // Clear input fields
-      setApplicantName('');
-      setApplicantEmail('');
+      setMemberName('');
+      setMemberEmail('');
       
     } catch (err) {
-      console.error('Error adding applicant:', err);
-      setError('Failed to add applicant');
+      console.error('Error adding member:', err);
+      setError('Failed to add member');
     }
   };
   
-  // Handle removing an applicant
-  const handleRemoveApplicant = async (applicantId) => {
+  // Handle removing a member
+  const handleRemoveMember = async (memberId) => {
     try {
-      const { error } = await deleteApplicant(applicantId);
+      const { error } = await deleteMember(memberId);
       
       if (error) {
         throw error;
       }
       
       // Update local state
-      setApplicants(prev => prev.filter(a => a.id !== applicantId));
+      setMembers(prev => prev.filter(m => m.id !== memberId));
       
     } catch (err) {
-      console.error('Error removing applicant:', err);
-      setError('Failed to remove applicant');
+      console.error('Error removing member:', err);
+      setError('Failed to remove member');
     }
   };
   
@@ -384,34 +386,34 @@ export default function EditJob() {
             )}
           </div>
           
-          {/* Applicants Section */}
+          {/* Members Section */}
           <div className="border-t border-gray-200 mt-8 pt-8">
-            <h2 className="text-xl font-semibold mb-6">Manage Applicants</h2>
+            <h2 className="text-xl font-semibold mb-6">Manage Members</h2>
             
-            {/* Add Applicant Form */}
+            {/* Add Member Form */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div className="transition-all duration-300 ease-in-out">
-                <label htmlFor="applicantName" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="memberName" className="block text-sm font-medium text-gray-700 mb-2">
                   Name
                 </label>
                 <input
-                  id="applicantName"
+                  id="memberName"
                   type="text"
                   className="form-input block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
-                  value={applicantName}
-                  onChange={(e) => setApplicantName(e.target.value)}
+                  value={memberName}
+                  onChange={(e) => setMemberName(e.target.value)}
                 />
               </div>
               <div className="transition-all duration-300 ease-in-out">
-                <label htmlFor="applicantEmail" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="memberEmail" className="block text-sm font-medium text-gray-700 mb-2">
                   Email Address
                 </label>
                 <input
-                  id="applicantEmail"
+                  id="memberEmail"
                   type="email"
                   className={`form-input block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 ${emailError ? 'border-red-500' : ''}`}
-                  value={applicantEmail}
-                  onChange={(e) => setApplicantEmail(e.target.value)}
+                  value={memberEmail}
+                  onChange={(e) => setMemberEmail(e.target.value)}
                 />
                 {emailError && (
                   <p className="text-red-500 text-sm mt-1 animate-pulse">{emailError}</p>
@@ -422,27 +424,27 @@ export default function EditJob() {
             <div className="flex items-center mb-6">
               <button
                 type="button"
-                onClick={handleAddApplicant}
+                onClick={handleAddMember}
                 className="btn btn-outline-primary hover:scale-105 transition-transform"
               >
-                + Add Applicant
+                + Add Member
               </button>
               
               {showAddedMessage && (
                 <span className="ml-3 text-green-500 text-sm animate-fade-in-out">
-                  Applicant added successfully!
+                  Member added successfully!
                 </span>
               )}
             </div>
             
-            {/* Applicants List */}
-            {isLoadingApplicants ? (
+            {/* Members List */}
+            {isLoadingMembers ? (
               <div className="text-center py-4">
-                <div className="animate-pulse">Loading applicants...</div>
+                <div className="animate-pulse">Loading members...</div>
               </div>
-            ) : applicants.length === 0 ? (
+            ) : members.length === 0 ? (
               <div className="text-center py-4 text-gray-500">
-                No applicants added yet
+                No members added yet
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -461,21 +463,21 @@ export default function EditJob() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {applicants.map((applicant) => (
-                      <tr key={applicant.id} className="hover:bg-gray-50">
+                    {members.map((member) => (
+                      <tr key={member.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">
-                            {applicant.name_email.name}
+                            {member.name_email.name}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-500">
-                            {applicant.name_email.email}
+                            {member.name_email.email}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
-                            onClick={() => handleRemoveApplicant(applicant.id)}
+                            onClick={() => handleRemoveMember(member.id)}
                             className="text-red-500 hover:text-red-700 transition-colors"
                           >
                             Remove

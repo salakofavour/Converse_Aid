@@ -89,14 +89,14 @@ export async function deleteAccount(userId) {
     if (userJobs?.length > 0) {
       const jobIds = userJobs.map(job => job.id);
       
-      // Delete applicants for all jobs
-      const { error: applicantsError } = await supabase
-        .from('applicants')
+      // Delete members for all jobs
+      const { error: membersError } = await supabase
+        .from('members')
         .delete()
         .in('job_id', jobIds);
 
-      if (applicantsError) {
-        console.error(`[${requestId}] Error deleting applicants:`, applicantsError);
+      if (membersError) {
+        console.error(`[${requestId}] Error deleting members:`, membersError);
       }
 
       // Delete Pinecone data for all jobs

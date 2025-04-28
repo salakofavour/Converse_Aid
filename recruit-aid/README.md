@@ -1,4 +1,4 @@
-# RecruitAid
+# Converse-Aid
 
 A modern recruitment management platform built with Next.js, Supabase, Bootstrap, and shadcn/ui.
 
@@ -30,8 +30,8 @@ A modern recruitment management platform built with Next.js, Supabase, Bootstrap
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/recruit-aid.git
-   cd recruit-aid
+   git clone https://github.com/yourusername/Converse-Aid.git
+   cd Converse-Aid
    ```
 
 2. Install dependencies:
@@ -71,7 +71,7 @@ A modern recruitment management platform built with Next.js, Supabase, Bootstrap
 
 This application can be easily deployed on Vercel:
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/yourusername/recruit-aid)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/yourusername/Converse-Aid)
 
 ## License
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { getApplicants, getJobs } from '@/lib/supabase';
+import { getJobs, getMembers } from '@/lib/supabase';
 import { Listbox } from '@headlessui/react';
 import { ChevronUpDownIcon } from '@heroicons/react/24/outline';
 import { EditorContent, useEditor } from '@tiptap/react';
@@ -9,11 +9,11 @@ import { useEffect, useState } from 'react';
 
 export default function ContinueThread() {
   const [selectedJob, setSelectedJob] = useState(null);
-  const [selectedApplicants, setSelectedApplicants] = useState([]);
+  const [selectedMembers, setSelectedMembers] = useState([]);
   const [jobs, setJobs] = useState([]);
-  const [applicants, setApplicants] = useState([]);
+  const [members, setMembers] = useState([]);
   const [isLoadingJobs, setIsLoadingJobs] = useState(true);
-  const [isLoadingApplicants, setIsLoadingApplicants] = useState(false);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
@@ -62,52 +62,52 @@ export default function ContinueThread() {
     loadJobs();
   }, []);
 
-  // Load applicants when job is selected
+  // Load members when job is selected
   useEffect(() => {
-    async function loadApplicants() {
+    async function loadMembers() {
       if (!selectedJob) {
-        setApplicants([]);
-        setSelectedApplicants([]);
+        setMembers([]);
+        setSelectedMembers([]);
         return;
       }
 
       try {
-        setIsLoadingApplicants(true);
+        setIsLoadingMembers(true);
         setError(null);
-        const { applicants: applicantsData, error: applicantsError } = await getApplicants(selectedJob.id);
+        const { members: membersData, error: membersError } = await getMembers(selectedJob.id);
         
-        if (applicantsError) throw new Error(applicantsError.message);
+        if (membersError) throw new Error(membersError.message);
         
-        const formattedApplicants = applicantsData?.map(app => ({
-          id: app.id,
-          name: app.name_email.name,
-          email: app.name_email.email,
-          threadId: app.thread_id,
-          messageId: app.message_id,
-          referenceId: app.reference_id,
-          overall_message_id: app.overall_message_id,
-          subject: app.subject
+        const formattedMembers = membersData?.map(member => ({
+          id: member.id,
+          name: member.name_email.name,
+          email: member.name_email.email,
+          threadId: member.thread_id,
+          messageId: member.message_id,
+          referenceId: member.reference_id,
+          overall_message_id: member.overall_message_id,
+          subject: member.subject
         })) || [];
         
-        setApplicants(formattedApplicants);
-        setSelectedApplicants([]);
+        setMembers(formattedMembers);
+        setSelectedMembers([]);
       } catch (err) {
-        console.error('Error loading applicants:', err);
-        setError('Failed to load applicants. Please try again.');
+        console.error('Error loading members:', err);
+        setError('Failed to load members. Please try again.');
       } finally {
-        setIsLoadingApplicants(false);
+        setIsLoadingMembers(false);
       }
     }
     
-    loadApplicants();
+    loadMembers();
   }, [selectedJob]);
 
-  // Handle selecting all applicants
-  const handleSelectAllApplicants = () => {
-    if (selectedApplicants.length === applicants.length) {
-      setSelectedApplicants([]);
+  // Handle selecting all members
+  const handleSelectAllMembers = () => {
+    if (selectedMembers.length === members.length) {
+      setSelectedMembers([]);
     } else {
-      setSelectedApplicants(applicants);
+      setSelectedMembers(members);
     }
   };
 
@@ -132,18 +132,18 @@ export default function ContinueThread() {
   // Handle sending email
   const handleSend = async () => {
     try {
-      if (!selectedJob || !selectedApplicants.length || !editor?.getHTML()) {
+      if (!selectedJob || !selectedMembers.length || !editor?.getHTML()) {
         setError('Please fill in all required fields');
         return;
       }
 
-      if (selectedApplicants.length > 25) {
+      if (selectedMembers.length > 25) {
         setError('Cannot send to more than 25 recipients at once');
         return;
       }
 
       // Validate thread information exists
-      const missingThreadInfo = selectedApplicants.filter(app => !app.overall_message_id);
+      const missingThreadInfo = selectedMembers.filter(member => !member.overall_message_id);
       if (missingThreadInfo.length > 0) {
         setError(`There is no thread to continue for: ${missingThreadInfo.map(a => a.name).join(', ')}`);
         return;
@@ -175,12 +175,12 @@ export default function ContinueThread() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           from: selectedJob.Job_email,
-          to: selectedApplicants.map(applicant => ({
-            ...applicant,
-            threadId: applicant.threadId,
-            messageId: applicant.messageId,
-            referenceId: applicant.referenceId,
-            subject: applicant.subject
+          to: selectedMembers.map(member => ({
+            ...member,
+            threadId: member.threadId,
+            messageId: member.messageId,
+            referenceId: member.referenceId,
+            subject: member.subject
           })),
           content: editor.getHTML(),
           access_token
@@ -228,7 +228,7 @@ export default function ContinueThread() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            applicants: headersResults
+            members: headersResults
           })
         });
       }
@@ -241,7 +241,7 @@ export default function ContinueThread() {
 
       // Reset form
       setSelectedJob(null);
-      setSelectedApplicants([]);
+      setSelectedMembers([]);
       editor.commands.setContent('');
 
     } catch (err) {
@@ -252,7 +252,7 @@ export default function ContinueThread() {
     }
   };
 
-  const isFormValid = selectedJob && selectedApplicants.length > 0 && editor?.getHTML();
+  const isFormValid = selectedJob && selectedMembers.length > 0 && editor?.getHTML();
 
   return (
     <div className="space-y-6">
@@ -308,24 +308,24 @@ export default function ContinueThread() {
           </Listbox>
         </div>
 
-        {/* Applicant Selection */}
+        {/* Member Selection */}
         <div className="space-y-1">
           <label className="block text-sm font-medium text-gray-700">To:</label>
           <div className={`relative ${!selectedJob || isSending ? 'opacity-60' : ''}`}>
             <Listbox
-              value={selectedApplicants}
-              onChange={setSelectedApplicants}
+              value={selectedMembers}
+              onChange={setSelectedMembers}
               multiple
-              disabled={!selectedJob || isLoadingApplicants || isSending}
+              disabled={!selectedJob || isLoadingMembers || isSending}
             >
               <div className="relative mt-1">
                 <Listbox.Button className={`relative w-full cursor-default rounded-lg bg-white py-2 pl-3 pr-10 text-left border ${
-                  !selectedJob || isLoadingApplicants || isSending ? 'bg-gray-50 cursor-not-allowed' : 'border-gray-300 hover:border-gray-400'
+                  !selectedJob || isLoadingMembers || isSending ? 'bg-gray-50 cursor-not-allowed' : 'border-gray-300 hover:border-gray-400'
                 } focus:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-opacity-50`}>
-                  <span className={`block truncate ${selectedApplicants.length > 0 ? 'text-black' : 'text-[#1a1a1a]'}`}>
-                    {isLoadingApplicants ? 'Loading applicants...' : 
-                      selectedApplicants.length === 0 ? 'Select applicants' :
-                      `${selectedApplicants.length} applicant(s) selected`}
+                  <span className={`block truncate ${selectedMembers.length > 0 ? 'text-black' : 'text-[#1a1a1a]'}`}>
+                    {isLoadingMembers ? 'Loading members...' : 
+                      selectedMembers.length === 0 ? 'Select members' :
+                      `${selectedMembers.length} member(s) selected`}
                   </span>
                   <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                     <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
@@ -336,17 +336,17 @@ export default function ContinueThread() {
                   {/* Select All Option */}
                   <div
                     className="relative cursor-pointer select-none py-2 pl-10 pr-4 hover:bg-primary-50 text-gray-900 border-b border-gray-100"
-                    onClick={handleSelectAllApplicants}
+                    onClick={handleSelectAllMembers}
                   >
                     <span className="block truncate font-medium">
-                      {selectedApplicants.length === applicants.length ? 'Deselect All' : 'Select All Applicants'}
+                      {selectedMembers.length === members.length ? 'Deselect All' : 'Select All Members'}
                     </span>
                   </div>
 
-                  {applicants.map((applicant) => (
+                  {members.map((member) => (
                     <Listbox.Option
-                      key={applicant.id}
-                      value={applicant}
+                      key={member.id}
+                      value={member}
                       className={({ active }) => `relative cursor-default select-none py-2 pl-10 pr-4 ${
                         active ? 'bg-primary-50 text-primary-900' : 'text-gray-900'
                       }`}
@@ -354,7 +354,7 @@ export default function ContinueThread() {
                       {({ selected }) => (
                         <>
                           <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
-                            {applicant.name}
+                            {member.name}
                           </span>
                         </>
                       )}
@@ -364,18 +364,18 @@ export default function ContinueThread() {
               </div>
             </Listbox>
 
-            {/* Selected Applicants Tags */}
-            {selectedApplicants.length > 0 && (
+            {/* Selected Members Tags */}
+            {selectedMembers.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
-                {selectedApplicants.map((applicant) => (
+                {selectedMembers.map((member) => (
                   <span
-                    key={applicant.id}
+                    key={member.id}
                     className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-primary-100 text-primary-800"
                   >
-                    {applicant.name}
+                    {member.name}
                     <button
                       type="button"
-                      onClick={() => setSelectedApplicants(selectedApplicants.filter(a => a.id !== applicant.id))}
+                      onClick={() => setSelectedMembers(selectedMembers.filter(a => a.id !== member.id))}
                       className="ml-1 inline-flex items-center p-0.5 rounded-full text-primary-400 hover:bg-primary-200 hover:text-primary-500 focus:outline-none"
                       disabled={isSending}
                     >
@@ -410,9 +410,9 @@ export default function ContinueThread() {
         <div className="flex justify-end">
           <button
             onClick={handleSend}
-            disabled={!isFormValid || isLoadingApplicants || isSending}
+            disabled={!isFormValid || isLoadingMembers || isSending}
             className={`px-4 py-2 rounded-md ${
-              isFormValid && !isLoadingApplicants && !isSending
+              isFormValid && !isLoadingMembers && !isSending
                 ? 'bg-primary text-white hover:bg-primary-600 hover:scale-105 transform transition-all'
                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
             }`}
@@ -423,11 +423,11 @@ export default function ContinueThread() {
       </div>
 
       {/* Loading Overlay */}
-      {(isLoadingApplicants || isSending) && (
+      {(isLoadingMembers || isSending) && (
         <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
           <div className="bg-white p-4 rounded-lg shadow-lg flex items-center space-x-3">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-            <span>{isLoadingApplicants ? 'Loading applicants...' : 'Sending email...'}</span>
+            <span>{isLoadingMembers ? 'Loading members...' : 'Sending email...'}</span>
           </div>
         </div>
       )}

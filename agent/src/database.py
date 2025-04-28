@@ -231,21 +231,21 @@ class DatabaseService:
             raise
 
     @retry_with_backoff()
-    def get_job_applicants(self, job_id: str) -> List[Dict[str, Any]]:
+    def get_job_members(self, job_id: str) -> List[Dict[str, Any]]:
         """
-        Get all applicants for a specific job.
+        Get all members for a specific job.
         
         Args:
             job_id: The UUID of the job
             
         Returns:
-            List of applicant records
+            List of member records
             
         Raises:
             ValueError: If query fails
         """
         try:
-            query = (self.client.table('applicants')
+            query = (self.client.table('members')
                     .select('id, name_email, thread_id, message_id, body, response, '
                            'overall_message_id, subject, reference_id')
                     .eq('job_id', job_id)
@@ -256,39 +256,39 @@ class DatabaseService:
             raise
 
     @retry_with_backoff()
-    def get_applicant_details(self, applicant_id: str) -> Dict[str, Any]:
+    def get_member_details(self, member_id: str) -> Dict[str, Any]:
         """
-        Get details for a specific applicant.
+        Get details for a specific member.
         
         Args:
-            applicant_id: The UUID of the applicant
+            member_id: The UUID of the member
             
         Returns:
-            Dict containing applicant details
+            Dict containing member details
             
         Raises:
-            ValueError: If applicant not found
+            ValueError: If member not found
         """
         try:
-            query = (self.client.table('applicants')
+            query = (self.client.table('members')
                     .select('*')
-                    .eq('id', applicant_id)
+                    .eq('id', member_id)
                     .execute())
             
             if not query.data:
-                raise ValueError(f"No applicant found with id: {applicant_id}")
+                raise ValueError(f"No member found with id: {member_id}")
             
             return query.data[0]
         except Exception as e:
             raise
 
     # @retry_with_backoff()
-    # def update_applicant_response(self, applicant_id: str, response: str) -> bool:
+    # def update_member_response(self, member_id: str, response: str) -> bool:
     #     """
-    #     Update the response field for an applicant.
+    #     Update the response field for an member.
         
     #     Args:
-    #         applicant_id: The UUID of the applicant
+    #         member_id: The UUID of the member
     #         response: The response text
             
     #     Returns:
@@ -298,9 +298,9 @@ class DatabaseService:
     #         ValueError: If update fails
     #     """
     #     try:
-    #         response = (self.client.table('applicants')
+    #         response = (self.client.table('members')
     #                 .update({"response": response})
-    #                 .eq('id', applicant_id)
+    #                 .eq('id', member_id)
     #                 .execute())
             
     #         return True
@@ -308,12 +308,12 @@ class DatabaseService:
     #         raise
 
     @retry_with_backoff()
-    def update_applicant_details(self, applicant_id: str, details: Dict[str, Any]) -> bool:
+    def update_member_details(self, member_id: str, details: Dict[str, Any]) -> bool:
         """
-        Update various details for an applicant.
+        Update various details for an member.
         
         Args:
-            applicant_id: The UUID of the applicant
+            member_id: The UUID of the member
             details: Dict containing fields to update
             
         Returns:
@@ -341,9 +341,9 @@ class DatabaseService:
             if not update_data:
                 raise ValueError("No valid fields to update")
             
-            response = (self.client.table('applicants')
+            response = (self.client.table('members')
                     .update(update_data)
-                    .eq('id', applicant_id)
+                    .eq('id', member_id)
                     .execute())
             
             return True

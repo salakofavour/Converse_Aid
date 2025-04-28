@@ -4,9 +4,9 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
-    const { applicants } = await request.json();
+    const { members } = await request.json();
     
-    if (!applicants || !Array.isArray(applicants)) {
+    if (!members || !Array.isArray(members)) {
       return NextResponse.json(
         { error: 'Invalid request format' },
         { status: 400 }
@@ -38,9 +38,9 @@ export async function POST(request) {
     );
 
     // Update each applicant's message_id and headers
-    const updates = applicants.map(({ id, gmailId, messageId, threadId, references, subject }) => 
+    const updates = members.map(({ id, gmailId, messageId, threadId, references, subject }) => 
       supabase
-        .from('applicants')
+        .from('members')
         .update({
           message_id: messageId || null,
           subject: subject || null,
@@ -58,7 +58,7 @@ export async function POST(request) {
     // Check for any errors in the updates
     const errors = results.filter(result => result.error);
     if (errors.length > 0) {
-      console.error('Errors updating applicants:', errors);
+      console.error('Errors updating members:', errors);
       return NextResponse.json(
         { error: 'Some updates failed', errors },
         { status: 500 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { getApplicants, getJobById } from '@/lib/supabase';
+import { getJobById, getMembers } from '@/lib/supabase';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -11,8 +11,8 @@ export default function JobDetail() {
   const [job, setJob] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [applicants, setApplicants] = useState([]);
-  const [isLoadingApplicants, setIsLoadingApplicants] = useState(true);
+  const [members, setMembers] = useState([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(true);
   
   // Load job data from Supabase
   useEffect(() => {
@@ -47,28 +47,28 @@ export default function JobDetail() {
     loadJob();
   }, [params.id]);
   
-  // Load applicants
+  // Load members
   useEffect(() => {
-    async function loadApplicants() {
+    async function loadMembers() {
       if (!params.id) return;
       
       try {
-        setIsLoadingApplicants(true);
-        const { applicants: applicantsData, error } = await getApplicants(params.id);
+        setIsLoadingMembers(true);
+        const { members: membersData, error } = await getMembers(params.id);
         
         if (error) {
-          console.error('Error loading applicants:', error);
+          console.error('Error loading members:', error);
         } else {
-          setApplicants(applicantsData || []);
+          setMembers(membersData || []);
         }
       } catch (err) {
-        console.error('Error loading applicants:', err);
+        console.error('Error loading members:', err);
       } finally {
-        setIsLoadingApplicants(false);
+        setIsLoadingMembers(false);
       }
     }
     
-    loadApplicants();
+    loadMembers();
   }, [params.id]);
   
   // Format date for display
@@ -236,17 +236,17 @@ export default function JobDetail() {
         </div>
       </div>
       
-      {/* Applicants Table */}
+      {/* Members Table */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <h2 className="text-lg font-semibold mb-4">Applicants ({applicants.length})</h2>
+        <h2 className="text-lg font-semibold mb-4">Members ({members.length})</h2>
         
-        {isLoadingApplicants ? (
+        {isLoadingMembers ? (
           <div className="text-center py-4">
-            <div className="animate-pulse">Loading applicants...</div>
+            <div className="animate-pulse">Loading members...</div>
           </div>
-        ) : applicants.length === 0 ? (
+        ) : members.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-gray-500">No applicants yet</p>
+            <p className="text-gray-500">No members yet</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -254,10 +254,10 @@ export default function JobDetail() {
               <thead className="bg-gray-50">
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Applicant Name
+                    Member Name
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Applicant Email
+                    Member Email
                   </th>
                   <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -265,16 +265,16 @@ export default function JobDetail() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {applicants.map((applicant) => (
-                  <tr key={applicant.id} className="hover:bg-gray-50">
+                {members.map((member) => (
+                  <tr key={member.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        {applicant.name_email.name}
+                        {member.name_email.name}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-500">
-                        {applicant.name_email.email}
+                        {member.name_email.email}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

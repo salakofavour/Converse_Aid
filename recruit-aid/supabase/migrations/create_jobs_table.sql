@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS "jobs" (
   flow_end_date DATE NOT NULL,
   responsibilities TEXT,
   qualifications TEXT,
-  applicants JSONB DEFAULT '[]'::jsonb,
+  members JSONB DEFAULT '[]'::jsonb,
   status TEXT NOT NULL DEFAULT 'active',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()

@@ -49,12 +49,12 @@ class EmailAutomationApp:
         """
         # Set up the job ID
         self.job_id = job_id or os.environ.get("DEFAULT_JOB_ID")
-        self.applicant_id = None  # Will be set during processing of each applicant
+        self.member_id = None  # Will be set during processing of each member
         
         # # Set up LLM and graph
         # self.graph = None
         # self.setup_graph()
-        self.graph = None  # Will be set up for each applicant in run()
+        self.graph = None  # Will be set up for each member in run()
     
     #normal function, not as a tool. tool = too much hassle
     def start_message(self) -> str:
@@ -65,21 +65,21 @@ class EmailAutomationApp:
             A string saying the initial message has been sent on success or failed to send on failure.
         """
         try:
-            # Get applicant details first
-            applicant = db.get_applicant_details(self.applicant_id)
-            if not applicant:
-                raise ValueError(f"No applicant found with ID {self.applicant_id}")
+            # Get member details first
+            member = db.get_member_details(self.member_id)
+            if not member:
+                raise ValueError(f"No member found with ID {self.member_id}")
                 
             # Send the message
-            response = email_service.send_first_message(self.job_id, applicant)
+            response = email_service.send_first_message(self.job_id, member)
             print("response from send_first_message: ", response)
             
             if response: 
-                # Update applicant details with the new message_id
+                # Update member details with the new message_id
                 message_data = email_service.get_message(self.job_id, response.get("id"))
                 print("message_data from recently sent message: ", message_data)
 
-                db.update_applicant_details(self.applicant_id, {
+                db.update_member_details(self.member_id, {
                     "message_id": message_data.get("message_id"),
                     "thread_id": message_data.get("message_id")
                 })
@@ -106,13 +106,13 @@ class EmailAutomationApp:
                 max_retries=3
             )
 
-            # Get applicant details
-            applicant = db.get_applicant_details(self.applicant_id)
+            # Get member details
+            member = db.get_member_details(self.member_id)
             
             # Search for relevant information using the last email's body
-            email_body = applicant.get("body", "")
+            email_body = member.get("body", "")
             print("email_body: ", email_body)
-            receiver = f"hi {applicant.get('name_email', {}).get('name', '')}"
+            receiver = f"hi {member.get('name_email', {}).get('name', '')}"
 
             email_context_prompt = PromptTemplate.from_template(
                 """You are a helpful assistant that is given a conversation thread. Your job is to extract the job related context of the last response not starting with {receiver} in a single sentence.
@@ -129,13 +129,13 @@ class EmailAutomationApp:
                 context = search_results["context"]
             else:
                 context = "Your question is not related to the job in question. Please refrain from asking questions that are not related to this role."
-                #send a notification email to the user informing the user that an applicant has asked a question not in KnowledgeBase
-                message = util.notification_message(self.applicant_id, self.job_id, "applicant - {applicant_email} asked a question that is  either not related to the job in question or not in the KnowledgeBase. We continued the conversation but you can check your email with {applicant_email} and subject - {subject_title} to see the question. It is the message before the applicant is informed not to ask questions that are not related to the job in question.")
+                #send a notification email to the user informing the user that an member has asked a question not in KnowledgeBase
+                message = util.notification_message(self.member_id, self.job_id, "member - {member_email} asked a question that is  either not related to the job in question or not in the KnowledgeBase. We continued the conversation but you can check your email with {member_email} and subject - {subject_title} to see the question. It is the message before the member is informed not to ask questions that are not related to the job in question.")
                 email_service.send_user_notification_email(message)
             
             # Generate response using template
             prompt = PromptTemplate.from_template(
-                """You are a helpful recruiting assistant that responds to applicants within a given context. Given a conversation history of {email_history},
+                """You are a helpful recruiting assistant that responds to members within a given context. Given a conversation history of {email_history},
                     if email_context is completely a greeting, respond with a complementary greeting & ask how you can help in 2-3 sentences.
                     else provide a 1-2 paragraph(not more than 2 sentences each, and no breaks between sentences except the paragraph break) well structured response strictly based in the given context. \n"
                     "Context: {context}\n"""
@@ -146,8 +146,8 @@ class EmailAutomationApp:
             result = llm.invoke(full_prompt.text)
             response = result.content
             
-            # Update applicant's response
-            # db.update_applicant_response(self.applicant_id, response)
+            # Update member's response
+            # db.update_member_response(self.member_id, response)
             # Update email response in state
             state["email_response"] = response
 
@@ -171,18 +171,18 @@ class EmailAutomationApp:
             The updated state informing the llm that the reply has been sent on success or failed to send on failure.
         """
         try:
-            # Get applicant details
-            applicant = db.get_applicant_details(self.applicant_id)
+            # Get member details
+            member = db.get_member_details(self.member_id)
             #get email response kept in state gotten from create_message
-            new_message = f"Hi {applicant['name_email']['name']}, \n\n {state['email_response']}" #here i will figure out how to add footers.
+            new_message = f"Hi {member['name_email']['name']}, \n\n {state['email_response']}" #here i will figure out how to add footers.
             
             # # Check if response exists and handle None case
             # if not new_message:
-            #     print(f"No response found for applicant {self.applicant_id}, retrying fetch...")
+            #     print(f"No response found for member {self.member_id}, retrying fetch...")
             #     # Could be a timing issue, wait briefly and try once more
             #     time.sleep(1)  # Add import time if not already imported
-            #     applicant = db.get_applicant_details(self.applicant_id)
-            #     new_message = applicant["response"]
+            #     member = db.get_member_details(self.member_id)
+            #     new_message = member["response"]
             #     if not new_message:
             #         return {
             #             "content": "Cannot send reply: no response message found in database", 
@@ -193,24 +193,24 @@ class EmailAutomationApp:
             
             # Prepare reply parameters
             reply_params = {
-                "to": applicant["name_email"]["email"],
+                "to": member["name_email"]["email"],
                 "body": new_message,
-                "thread_id": applicant["thread_id"],
-                "subject": f"Re: {applicant['subject']}" if not applicant['subject'].startswith("Re:") else applicant['subject'],
-                "message_id": applicant["message_id"],
-                "references": applicant["reference_id"]
+                "thread_id": member["thread_id"],
+                "subject": f"Re: {member['subject']}" if not member['subject'].startswith("Re:") else member['subject'],
+                "message_id": member["message_id"],
+                "references": member["reference_id"]
             }
             
             # Send the reply
-            response = email_service.send_reply(self.job_id, self.applicant_id, reply_params)
+            response = email_service.send_reply(self.job_id, self.member_id, reply_params)
             print("response from send_reply: ", response)
             
             if response: #response.get("status") == "success"
-                #update applicant details with the new message_id, thread_id and overall_message_id of the just sent email
+                #update member details with the new message_id, thread_id and overall_message_id of the just sent email
                 message_data = email_service.get_message(self.job_id, response.get("id"))
                 print("message_data from recently sent message: ", message_data)
 
-                db.update_applicant_details(self.applicant_id, {
+                db.update_member_details(self.member_id, {
                     "message_id": message_data.get("message_id")
                 })
 
@@ -287,8 +287,8 @@ class EmailAutomationApp:
                 
             # config_data = {
             #     "configurable": {
-            #         "thread_id": self.applicant_id # thread_id is an expected value, her it is not the email thread id, its just the name of the parameter
-            #         # "applicant_id": self.applicant_id
+            #         "thread_id": self.member_id # thread_id is an expected value, her it is not the email thread id, its just the name of the parameter
+            #         # "member_id": self.member_id
             #     }
             # }
                 
@@ -326,12 +326,12 @@ class EmailAutomationApp:
     
     def run(self) -> Dict[str, Any]:
         """
-        Run the email automation workflow for all applicants of a job.
+        Run the email automation workflow for all members of a job.
         
         This method:
         1. Validates auth tokens
-        2. Gets all applicants for the job
-        3. Processes each applicant's email thread
+        2. Gets all members for the job
+        3. Processes each member's email thread
         
         return:
             Dict with status and results information
@@ -347,33 +347,33 @@ class EmailAutomationApp:
             # Validate authentication tokens
             auth_service.validate_token(self.job_id)
             
-            # Get all applicants for this job
-            applicants = db.get_job_applicants(self.job_id)
+            # Get all members for this job
+            members = db.get_job_members(self.job_id)
             
-            if not applicants:
+            if not members:
                 return {
                     "status": "no_action",
-                    "message": "No applicants found for this job"
+                    "message": "No members found for this job"
                 }
-            print("applicants count", len(applicants))
+            print("members count", len(members))
             results = []
-            for applicant in applicants:
+            for member in members:
                 try:
-                    # Set current applicant for tools to use
-                    self.applicant_id = applicant['id']
+                    # Set current member for tools to use
+                    self.member_id = member['id']
                     
-                    # Reset graph for each applicant
+                    # Reset graph for each member
                     self.setup_graph()
                     
 
-                    # Check for new emails from this applicant
+                    # Check for new emails from this member
                     email_result = email_service.check_for_new_emails(
                         job_id=self.job_id,
-                        applicant_id=applicant['id'],
-                        applicant_email=applicant['name_email']['email']
+                        member_id=member['id'],
+                        member_email=member['name_email']['email']
                     )
 
-                    # Check if the applicant has not received an initial message from the user/agent
+                    # Check if the member has not received an initial message from the user/agent
                     if email_result["status"] == "no initial message":
                         print("no initial message, sending initial message")
 
@@ -382,8 +382,8 @@ class EmailAutomationApp:
                         print("start_message_result: ", start_message_result)
 
                         results.append({
-                            "applicant_id": applicant['id'],
-                            "email": applicant['name_email']['email'],
+                            "member_id": member['id'],
+                            "email": member['name_email']['email'],
                             "status": "success",
                             "message": "Sent the default initial message"
                                 })
@@ -394,28 +394,28 @@ class EmailAutomationApp:
                         self.stream_graph_updates(user_input)
 
                         results.append({
-                            "applicant_id": applicant['id'],
-                            "email": applicant['name_email']['email'],
+                            "member_id": member['id'],
+                            "email": member['name_email']['email'],
                             "status": "success",
                             "message": "Found new email and sent response",
                             "email_data": email_result.get("email_data")
                                 })
                     else:
                         results.append({
-                            "applicant_id": applicant['id'],
-                            "email": applicant['name_email']['email'],
+                            "member_id": member['id'],
+                            "email": member['name_email']['email'],
                             "status": "no_action",
                             "message": email_result.get("message", "No new message, so no action taken")
                         })
                         
                 except Exception as e:
                     results.append({
-                        "applicant_id": applicant['id'],
-                        "email": applicant['name_email']['email'],
+                        "member_id": member['id'],
+                        "email": member['name_email']['email'],
                         "status": "error",
-                        "message": f"Error processing applicant: {str(e)}"
+                        "message": f"Error processing member: {str(e)}"
                     })
-                    continue  # Continue with next applicant even if one fails
+                    continue  # Continue with next member even if one fails
             
             # Summarize results
             success_count = sum(1 for r in results if r["status"] == "success")
@@ -425,7 +425,7 @@ class EmailAutomationApp:
             return {
                 "status": "completed",
                 "summary": {
-                    "total_applicants": len(applicants),
+                    "total_members": len(members),
                     "successful_responses": success_count,
                     "errors": error_count,
                     "no_action_needed": no_action_count

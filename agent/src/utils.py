@@ -67,25 +67,25 @@ class Util:
     #     except Exception as e:
     #         raise(f"Error checking if job ID exists: {e}")
 
-    # def notification_message(message: str, applicant_id: str="", job_id: str="", isJob:bool=False) -> str: #this is here incase I need to make changes to the message, I can do it here instead of having to change it in multiple places
+    # def notification_message(message: str, member_id: str="", job_id: str="", isJob:bool=False) -> str: #this is here incase I need to make changes to the message, I can do it here instead of having to change it in multiple places
     #     """
     #     Generate a notification message for a user.
         
     #     Args:
-    #         applicant_id: The ID of the applicant
+    #         member_id: The ID of the member
     #         job_id: The ID of the job
     #         message: The message to send to the user
             
     #     Returns:
     #         A dictionary containing the needed information to send a notification message for the user
     #     """
-    #     applicant_details = db.get_applicant_details(applicant_id)
+    #     member_details = db.get_member_details(member_id)
     #     job_details = db.get_job_details(job_id)
 
     #     if isJob:
     #         email_message = message
     #     else:
-    #         email_message = message.format(applicant_email=applicant_details["name_email"]["email"], subject_title=applicant_details["subject"])
+    #         email_message = message.format(member_email=member_details["name_email"]["email"], subject_title=member_details["subject"])
         
     #     return{
     #         "body": email_message,

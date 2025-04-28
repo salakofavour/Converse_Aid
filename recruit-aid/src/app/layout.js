@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "RecruitAid - Streamline Your Recruitment Process",
+  title: "Converse-Aid - Streamline Your Recruitment Process",
   description: "A powerful platform to manage your recruitment process efficiently",
 };
 

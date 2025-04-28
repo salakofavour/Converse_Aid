@@ -11,7 +11,7 @@ export async function sendSubscriptionNotification(email, daysUntilExpiry, jobCo
       subject: `Subscription Expiring in ${daysUntilExpiry} Days`,
       html: `
         <div>
-          <h2>Your RecruitAid Pro Subscription is Expiring Soon</h2>
+          <h2>Your Converse-Aid Pro Subscription is Expiring Soon</h2>
           <p>Your subscription will expire in ${daysUntilExpiry} days. You currently have ${jobCount} active jobs.</p>
           <p>If you don't renew your subscription:</p>
           <ul>
@@ -38,12 +38,12 @@ export async function sendPaymentFailedNotification(userEmail) {
       to: userEmail,
       subject: 'Payment Failed - Action Required',
       html: `
-        <h2>Payment Failed for Your RecruitAid Subscription</h2>
-        <p>We were unable to process your payment for your RecruitAid subscription.</p>
+        <h2>Payment Failed for Your Converse-Aid Subscription</h2>
+        <p>We were unable to process your payment for your Converse-Aid subscription.</p>
         <p>Please update your payment information to maintain access to all Pro features. If your payment is not updated within 7 days, your subscription will be canceled and any jobs exceeding the 5-job limit will be deleted.</p>
         <p>To update your payment information:</p>
         <ol>
-          <li>Log in to your RecruitAid account</li>
+          <li>Log in to your Converse-Aid account</li>
           <li>Go to Settings > Preferences</li>
           <li>Click on "Manage Subscription"</li>
           <li>Update your payment details</li>
@@ -64,13 +64,13 @@ export async function sendPaymentFailedNotification(userEmail) {
 //       to: userEmail,
 //       subject: `Subscription Ending in ${daysRemaining} Days`,
 //       html: `
-//         <h2>Your RecruitAid Subscription is Ending Soon</h2>
+//         <h2>Your Converse-Aid Subscription is Ending Soon</h2>
 //         <p>Your subscription will expire in ${daysRemaining} days.</p>
 //         ${jobCount > 5 ? `
 //         <p>You currently have ${jobCount} jobs. When your subscription expires, only your 5 most recent jobs will be retained. The remaining ${jobCount - 5} jobs will be permanently deleted.</p>
 //         <p>To keep all your jobs and maintain access to Pro features, please renew your subscription:</p>
 //         <ol>
-//           <li>Log in to your RecruitAid account</li>
+//           <li>Log in to your Converse-Aid account</li>
 //           <li>Go to Settings > Preferences</li>
 //           <li>Click on "Renew Subscription"</li>
 //         </ol>
