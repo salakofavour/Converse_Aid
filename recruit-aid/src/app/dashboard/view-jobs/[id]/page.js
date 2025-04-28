@@ -85,7 +85,7 @@ export default function JobDetail() {
   };
 
   // Check if job can be edited (not closed)
-  const canEdit = job && (new Date() <= new Date(job.flow_end_date));
+  const canEdit = job && (new Date() <= new Date(job.job_end_date));
   
   if (isLoading) {
     return (
@@ -173,11 +173,11 @@ export default function JobDetail() {
           <div className="flex justify-between items-start mb-4">
             <h2 className="text-xl font-bold text-gray-900">{job.title}</h2>
             <span className={`px-3 py-1 text-sm font-semibold rounded-full ${
-              new Date() <= new Date(job.flow_end_date)
+              new Date() <= new Date(job.job_end_date)
                 ? 'bg-green-100 text-green-800'
                 : 'bg-red-100 text-red-800'
             }`}>
-              {new Date() <= new Date(job.flow_end_date)
+              {new Date() <= new Date(job.job_end_date)
                 ? 'Active'
                 : 'Closed'}
             </span>
@@ -185,37 +185,16 @@ export default function JobDetail() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <h3 className="text-sm font-medium text-gray-500">Department</h3>
-              <p className="text-base text-gray-900">{job.department}</p>
+              <h3 className="text-sm font-medium text-gray-500">Job Title</h3>
+              <p className="text-base text-gray-900">{job.title}</p>
             </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Location</h3>
-              <p className="text-base text-gray-900">{job.location}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Job Type</h3>
-              <p className="text-base text-gray-900 capitalize">{job.job_type.replace('-', ' ')}</p>
-            </div>
-            {(job.salary_min || job.salary_max) && (
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Salary Range</h3>
-                <p className="text-base text-gray-900">
-                  {job.salary_min && job.salary_max 
-                    ? `$${Number(job.salary_min).toLocaleString()} - $${Number(job.salary_max).toLocaleString()}`
-                    : job.salary_min 
-                      ? `From $${Number(job.salary_min).toLocaleString()}`
-                      : `Up to $${Number(job.salary_max).toLocaleString()}`
-                  }
-                </p>
-              </div>
-            )}
             <div>
               <h3 className="text-sm font-medium text-gray-500">Start Time</h3>
-              <p className="text-base text-gray-900">{formatDate(job.flow_start_date)}</p>
+              <p className="text-base text-gray-900">{formatDate(job.job_start_date)}</p>
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500">End Time</h3>
-              <p className="text-base text-gray-900">{formatDate(job.flow_end_date)}</p>
+              <p className="text-base text-gray-900">{formatDate(job.job_end_date)}</p>
             </div>
             {job.Job_email && (
               <div>
@@ -226,29 +205,29 @@ export default function JobDetail() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-auto">
-            {job.responsibilities && (
+            {job.About && (
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Responsibilities</h3>
+                <h3 className="text-sm font-medium text-gray-500 mb-2">About</h3>
                 <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
-                  {formatBulletPoints(job.responsibilities).slice(0, 3).map((point, index) => (
+                  {formatBulletPoints(job.About).slice(0, 3).map((point, index) => (
                     <li key={index}>{point}</li>
                   ))}
-                  {formatBulletPoints(job.responsibilities).length > 3 && (
-                    <li className="text-primary">+ {formatBulletPoints(job.responsibilities).length - 3} more</li>
+                  {formatBulletPoints(job.About).length > 3 && (
+                    <li className="text-primary">+ {formatBulletPoints(job.About).length - 3} more</li>
                   )}
                 </ul>
               </div>
             )}
             
-            {job.qualifications && (
+            {job.MoreDetails && (
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">qualifications</h3>
+                <h3 className="text-sm font-medium text-gray-500 mb-2">More Details</h3>
                 <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
-                  {formatBulletPoints(job.qualifications).slice(0, 3).map((point, index) => (
+                  {formatBulletPoints(job.MoreDetails).slice(0, 3).map((point, index) => (
                     <li key={index}>{point}</li>
                   ))}
-                  {formatBulletPoints(job.qualifications).length > 3 && (
-                    <li className="text-primary">+ {formatBulletPoints(job.qualifications).length - 3} more</li>
+                  {formatBulletPoints(job.MoreDetails).length > 3 && (
+                    <li className="text-primary">+ {formatBulletPoints(job.MoreDetails).length - 3} more</li>
                   )}
                 </ul>
               </div>

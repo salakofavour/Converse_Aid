@@ -4,7 +4,7 @@ import { CancellationWarningModal } from '@/components/modals/CancellationWarnin
 import { createBrowserClient } from '@supabase/ssr';
 import { redirect, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 export default function SubscriptionPage() {
   const [loading, setLoading] = useState(true);

@@ -1,5 +1,6 @@
 'use client';
 
+import { changeEmail, deleteAccount } from '@/lib/account';
 import { createProfile, getProfile, getUser, updateProfile, updateSenderEmails } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -335,81 +336,49 @@ useEffect(() => {
   };
 
   const handleEmailChange = async () => {
-    if (!newEmail) {
-      setSecurityError('Please enter a new email address');
-      return;
-    }
-
-    if (!validateEmail(newEmail)) {
-      setSecurityError('Please enter a valid email address');
-      return;
-    }
-
     setIsProcessing(true);
     setSecurityError('');
 
     try {
-      const response = await fetch('/api/account/change-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: JSON.stringify({ newEmail })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to change email');
+      const result = await changeEmail(profileData.email);
+      
+      if (result.success) {
+        setShowEmailChangeModal(false);
+        alert(result.message);
+        router.push('/auth/signout');
+      } else {
+        setSecurityError(result.error || 'Failed to change email');
       }
-
-      alert(data.message);
-      setShowEmailChangeModal(false);
-      setNewEmail('');
     } catch (err) {
       console.error('Error changing email:', err);
-      setSecurityError(err.message);
+      setSecurityError('An unexpected error occurred. Please try again.');
     } finally {
       setIsProcessing(false);
     }
   };
 
   const handleDeleteAccount = async () => {
-    if (!deleteConfirmEmail) {
-      setSecurityError('Please enter your email to confirm');
-      return;
-    }
-
-    if (deleteConfirmEmail !== profileData.email) {
-      setSecurityError('Email does not match your account email');
-      return;
-    }
-
     setIsProcessing(true);
     setSecurityError('');
 
     try {
-      const response = await fetch('/api/account/delete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
-        }
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to delete account');
+      if (deleteConfirmEmail !== profileData.email) {
+        setSecurityError('Email confirmation does not match your account email.');
+        return;
       }
 
-      alert(data.message);
-      // Redirect to home page after successful deletion
-      router.push('/');
+      const result = await deleteAccount();
+      
+      if (result.success) {
+        setShowDeleteConfirmModal(false);
+        alert(result.message);
+        router.push('/auth/signout');
+      } else {
+        setSecurityError(result.error || 'Failed to delete account');
+      }
     } catch (err) {
       console.error('Error deleting account:', err);
-      setSecurityError(err.message);
+      setSecurityError('An unexpected error occurred. Please try again.');
     } finally {
       setIsProcessing(false);
     }

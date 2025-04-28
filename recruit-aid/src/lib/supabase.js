@@ -132,7 +132,7 @@ export async function updateJob(jobId, jobData) {
     .select()
     .single();
   
-  if (!error && data) {
+  if (!error && data && !jobData.subject && !jobData.default_message) {
     try {
       // Update vectors in Pinecone
       await uploadVectors(data);

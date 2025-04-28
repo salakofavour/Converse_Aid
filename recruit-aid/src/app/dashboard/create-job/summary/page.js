@@ -56,22 +56,13 @@ export default function JobSummary() {
     try {
       // Determine status based on end date only
       const currentDate = new Date();
-      const endDate = new Date(jobData.flowEndDate);
+      const endDate = new Date(jobData.jobEndDate);
       const status = currentDate <= endDate ? 'active' : 'closed';
       
       // Prepare job data for submission
       const supabaseJobData = {
         title: jobData.title,
-        department: jobData.department,
-        location: jobData.location,
-        job_type: jobData.jobType,
-        salary_min: jobData.salaryMin || null,
-        salary_max: jobData.salaryMax || null,
-        flow_start_date: jobData.flowStartDate,
-        flow_end_date: jobData.flowEndDate,
-        responsibilities: jobData.responsibilities,
-        qualifications: jobData.qualifications,
-        Job_email: jobData.senderEmail,
+        job_email: jobData.senderEmail,
         status: status
       };
       
@@ -179,33 +170,8 @@ export default function JobSummary() {
                 <p className="text-gray-900">{jobData.title}</p>
               </div>
               <div>
-                <h3 className="text-gray-500 text-sm font-medium mb-1">Department</h3>
-                <p className="text-gray-900">{jobData.department}</p>
-              </div>
-              <div>
-                <h3 className="text-gray-500 text-sm font-medium mb-1">Location</h3>
-                <p className="text-gray-900">{jobData.location}</p>
-              </div>
-              <div>
-                <h3 className="text-gray-500 text-sm font-medium mb-1">Job Type</h3>
-                <p className="text-gray-900">{jobData.jobType === 'in-office' ? 'In-Office' : jobData.jobType === 'hybrid' ? 'Hybrid' : 'Remote'}</p>
-              </div>
-              {(jobData.salaryMin || jobData.salaryMax) && (
-                <div>
-                  <h3 className="text-gray-500 text-sm font-medium mb-1">Salary Range</h3>
-                  <p className="text-gray-900">
-                    {jobData.salaryMin && jobData.salaryMax 
-                      ? `$${Number(jobData.salaryMin).toLocaleString()} - $${Number(jobData.salaryMax).toLocaleString()} per year`
-                      : jobData.salaryMin 
-                        ? `Starting from $${Number(jobData.salaryMin).toLocaleString()} per year`
-                        : `Up to $${Number(jobData.salaryMax).toLocaleString()} per year`
-                    }
-                  </p>
-                </div>
-              )}
-              <div>
                 <h3 className="text-gray-500 text-sm font-medium mb-1">Recruitment Timeline</h3>
-                <p className="text-gray-900">{formatDate(jobData.flowStartDate)} to {formatDate(jobData.flowEndDate)}</p>
+                <p className="text-gray-900">{formatDate(jobData.jobStartDate)} to {formatDate(jobData.jobEndDate)}</p>
               </div>
             </div>
           </div>
@@ -214,24 +180,22 @@ export default function JobSummary() {
             <h2 className="text-xl font-semibold mb-4">About the Role</h2>
             <p className="text-gray-700">
               We're looking for a {jobData.title} to join our team
-              {jobData.jobType === 'remote' ? ' remotely' : jobData.jobType === 'hybrid' ? ' in a hybrid capacity' : ''}
-              {jobData.location ? ` in ${jobData.location}` : ''}.
             </p>
           </div>
           
           <div className="border-b border-gray-200 pb-6">
-            <h2 className="text-xl font-semibold mb-4">Responsibilities</h2>
+            <h2 className="text-xl font-semibold mb-4">About</h2>
             <ul className="list-disc pl-5 space-y-2 text-gray-700">
-              {formatBulletPoints(jobData.responsibilities).map((point, index) => (
+              {formatBulletPoints(jobData.about).map((point, index) => (
                 <li key={index}>{point}</li>
               ))}
             </ul>
           </div>
           
           <div className="border-b border-gray-200 pb-6">
-            <h2 className="text-xl font-semibold mb-4">qualifications</h2>
+            <h2 className="text-xl font-semibold mb-4">More Details</h2>
             <ul className="list-disc pl-5 space-y-2 text-gray-700">
-              {formatBulletPoints(jobData.qualifications).map((point, index) => (
+              {formatBulletPoints(jobData.moreDetails).map((point, index) => (
                 <li key={index}>{point}</li>
               ))}
             </ul>

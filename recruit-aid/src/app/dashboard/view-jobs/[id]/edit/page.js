@@ -10,17 +10,11 @@ export default function EditJob() {
   const router = useRouter();
   const [formData, setFormData] = useState({
     title: '',
-    department: '',
-    location: '',
-    jobType: '',
-    salaryMin: '',
-    salaryMax: '',
-    flowStartDate: '',
-    flowEndDate: '',
-    responsibilities: '',
-    qualifications: '',
+    jobStartDate: '',
+    jobEndDate: '',
+    about: '',
+    moreDetails: '',
     status: 'active',
-    statusManuallySet: false,
     applicants: [],
     Job_email: ''
   });
@@ -60,7 +54,7 @@ export default function EditJob() {
         
         // Check if job is closed based on end date
         const currentDate = new Date();
-        const endDate = new Date(job.flow_end_date);
+        const endDate = new Date(job.job_end_date);
         if (currentDate > endDate) {
           router.push(`/dashboard/view-jobs/${params.id}`);
           return;
@@ -75,15 +69,11 @@ export default function EditJob() {
         
         setFormData({
           title: job.title || '',
-          department: job.department || '',
-          location: job.location || '',
-          jobType: job.job_type || '',
-          salaryMin: job.salary_min || '',
-          salaryMax: job.salary_max || '',
-          flowStartDate: formatDateForInput(job.flow_start_date),
-          flowEndDate: formatDateForInput(job.flow_end_date),
-          responsibilities: job.responsibilities || '',
-          qualifications: job.qualifications || '',
+          jobStartDate: formatDateForInput(job.job_start_date),
+          jobEndDate: formatDateForInput(job.job_end_date),
+          about: job.about || '',
+          moreDetails: job.more_details || '',
+          status: job.status || 'active',
           Job_email: job.Job_email || ''
         });
       } catch (err) {
@@ -160,25 +150,15 @@ export default function EditJob() {
     setError(null);
 
     try {
-      // Determine status based on end date
-      const currentDate = new Date();
-      const endDate = new Date(formData.flowEndDate);
-      const status = currentDate <= endDate ? 'active' : 'closed';
-
       // Prepare job data for submission
       const jobData = {
         title: formData.title,
-        department: formData.department,
-        location: formData.location,
-        job_type: formData.jobType,
-        salary_min: formData.salaryMin || null,
-        salary_max: formData.salaryMax || null,
-        flow_start_date: formData.flowStartDate,
-        flow_end_date: formData.flowEndDate,
-        responsibilities: formData.responsibilities,
-        qualifications: formData.qualifications,
+        job_start_date: formData.jobStartDate,
+        job_end_date: formData.jobEndDate,
+        about: formData.about,
+        more_details: formData.moreDetails,
         Job_email: formData.Job_email,
-        status: status
+        status: formData.status
       };
 
       const { error: updateError } = await updateJob(params.id, jobData);
@@ -308,95 +288,14 @@ export default function EditJob() {
             </div>
             
             <div className="space-y-2">
-              <label htmlFor="department" className="block text-sm font-medium text-gray-700">
-                Department <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                id="department"
-                name="department"
-                value={formData.department}
-                onChange={handleChange}
-                className="form-input block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="location" className="block text-sm font-medium text-gray-700">
-                Location <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                id="location"
-                name="location"
-                value={formData.location}
-                onChange={handleChange}
-                className="form-input block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="jobType" className="block text-sm font-medium text-gray-700">
-                Job Type <span className="text-red-500">*</span>
-              </label>
-              <select
-                id="jobType"
-                name="jobType"
-                value={formData.jobType}
-                onChange={handleChange}
-                className="form-select block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
-                required
-              >
-                <option value="">Select Job Type</option>
-                <option value="in-office">In-Office</option>
-                <option value="hybrid">Hybrid</option>
-                <option value="remote">Remote</option>
-              </select>
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="salaryMin" className="block text-sm font-medium text-gray-700">
-                Minimum Salary
-              </label>
-              <input
-                type="number"
-                id="salaryMin"
-                name="salaryMin"
-                value={formData.salaryMin}
-                onChange={handleChange}
-                className="form-input block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
-                min="0"
-                step="1000"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="salaryMax" className="block text-sm font-medium text-gray-700">
-                Maximum Salary
-              </label>
-              <input
-                type="number"
-                id="salaryMax"
-                name="salaryMax"
-                value={formData.salaryMax}
-                onChange={handleChange}
-                className="form-input block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
-                min="0"
-                step="1000"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="flowStartDate" className="block text-sm font-medium text-gray-700">
-                Flow Start Date <span className="text-red-500">*</span>
+              <label htmlFor="jobStartDate" className="block text-sm font-medium text-gray-700">
+                Job Start Date <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
-                id="flowStartDate"
-                name="flowStartDate"
-                value={formData.flowStartDate}
+                id="jobStartDate"
+                name="jobStartDate"
+                value={formData.jobStartDate}
                 onChange={handleChange}
                 className="form-input block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
                 required
@@ -404,14 +303,14 @@ export default function EditJob() {
             </div>
             
             <div className="space-y-2">
-              <label htmlFor="flowEndDate" className="block text-sm font-medium text-gray-700">
-                Flow End Date <span className="text-red-500">*</span>
+              <label htmlFor="jobEndDate" className="block text-sm font-medium text-gray-700">
+                Job End Date <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
-                id="flowEndDate"
-                name="flowEndDate"
-                value={formData.flowEndDate}
+                id="jobEndDate"
+                name="jobEndDate"
+                value={formData.jobEndDate}
                 onChange={handleChange}
                 className="form-input block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
                 required
@@ -420,14 +319,14 @@ export default function EditJob() {
           </div>
           
           <div className="space-y-2">
-            <label htmlFor="responsibilities" className="block text-sm font-medium text-gray-700">
-              Job Responsibilities
+            <label htmlFor="about" className="block text-sm font-medium text-gray-700">
+              About
             </label>
             <p className="text-xs text-gray-500">Enter each responsibility on a new line</p>
             <textarea
-              id="responsibilities"
-              name="responsibilities"
-              value={formData.responsibilities}
+              id="about"
+              name="about"
+              value={formData.about}
               onChange={handleChange}
               rows={5}
               className="form-textarea block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
@@ -436,14 +335,14 @@ export default function EditJob() {
           </div>
           
           <div className="space-y-2">
-            <label htmlFor="qualifications" className="block text-sm font-medium text-gray-700">
-              Job qualifications
+            <label htmlFor="moreDetails" className="block text-sm font-medium text-gray-700">
+              More Details
             </label>
             <p className="text-xs text-gray-500">Enter each requirement on a new line</p>
             <textarea
-              id="qualifications"
-              name="qualifications"
-              value={formData.qualifications}
+              id="moreDetails"
+              name="moreDetails"
+              value={formData.moreDetails}
               onChange={handleChange}
               rows={5}
               className="form-textarea block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"

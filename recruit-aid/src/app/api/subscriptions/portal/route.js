@@ -1,16 +1,17 @@
-import { stripe } from '@/lib/stripe';
+import { validateCSRFToken } from '@/lib/csrf';
+import { createBillingPortalSession } from '@/lib/subscription';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
-    // Verify CSRF protection
-    const requestedWith = request.headers.get('x-requested-with');
-    if (!requestedWith || requestedWith !== 'XMLHttpRequest') {
-      return NextResponse.json(
-        { error: 'Invalid request' },
-        { status: 403 }
-      );
+    // Validate CSRF token
+    const csrfError = await validateCSRFToken(request);
+    if (csrfError) {
+      return NextResponse.json({
+        success: false,
+        error: csrfError
+      }, { status: 403 });
     }
 
     const supabase = createServerClient(
@@ -42,27 +43,16 @@ export async function POST(request) {
       );
     }
 
-    // Get user's stripe customer ID
-    const { data: subscription } = await supabase
-      .from('subscriptions')
-      .select('stripe_customer_id')
-      .eq('user_id', user.id)
-      .single();
+    const result = await createBillingPortalSession(user.id);
 
-    if (!subscription?.stripe_customer_id) {
+    if (!result.success) {
       return NextResponse.json(
-        { error: 'No billing account found' },
-        { status: 404 }
+        { error: result.error },
+        { status: 400 }
       );
     }
 
-    // Create Stripe portal session
-    const session = await stripe.billingPortal.sessions.create({
-      customer: subscription.stripe_customer_id,
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings/subscription`,
-    });
-
-    return NextResponse.json({ url: session.url });
+    return NextResponse.json({ url: result.url });
   } catch (error) {
     console.error('Error creating portal session:', error);
     return NextResponse.json(

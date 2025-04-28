@@ -7,7 +7,7 @@ import { TrashIcon } from '@heroicons/react/24/outline';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 export default function ViewJobs() {
   const router = useRouter();
@@ -176,6 +176,13 @@ export default function ViewJobs() {
     }
   };
 
+  // Before the return statement, define a function to truncate the about text
+  function truncateAbout(text) {
+    if (!text) return '';
+    const words = text.split(' ');
+    return words.length > 10 ? words.slice(0, 10).join(' ') + '...' : text;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -267,11 +274,11 @@ export default function ViewJobs() {
                         </span>
                       )}
                       <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        new Date() <= new Date(job.flow_end_date)
+                        new Date() <= new Date(job.job_end_date)
                           ? 'bg-green-100 text-green-800'
                           : 'bg-red-100 text-red-800'
                       }`}>
-                        {new Date() <= new Date(job.flow_end_date)
+                        {new Date() <= new Date(job.job_end_date)
                           ? 'Active'
                           : 'Closed'}
                       </span>
@@ -280,23 +287,15 @@ export default function ViewJobs() {
                   
                   <div className="space-y-2 mb-4">
                     <div className="flex items-center text-sm">
-                      <span className="text-gray-500 mr-2">Department:</span>
-                      <span className="text-gray-700">{job.department}</span>
-                    </div>
-                    <div className="flex items-center text-sm">
-                      <span className="text-gray-500 mr-2">Location:</span>
-                      <span className="text-gray-700">{job.location}</span>
-                    </div>
-                    <div className="flex items-center text-sm">
-                      <span className="text-gray-500 mr-2">Type:</span>
-                      <span className="text-gray-700 capitalize">{job.job_type.replace('-', ' ')}</span>
+                      <span className="text-gray-500 mr-2">About:</span>
+                      <span className="text-gray-700">{truncateAbout(job.about)}</span>
                     </div>
                   </div>
                   
                   <div className="flex justify-between items-center pt-3 border-t border-gray-100">
                     <div className="text-sm">
                       <span className="text-gray-500 mr-1">Start:</span>
-                      <span className="text-gray-700">{formatDate(job.flow_start_date)}</span>
+                      <span className="text-gray-700">{formatDate(job.job_start_date)}</span>
                     </div>
                     <div className="flex items-center">
                       <div className="text-sm text-gray-600 mr-3">
@@ -315,13 +314,13 @@ export default function ViewJobs() {
                       <div className="relative w-48">
                         <select
                           className={`form-select w-full focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-all
-                            ${!isSubscribed || new Date() > new Date(job.flow_end_date)
+                            ${!isSubscribed || new Date() > new Date(job.job_end_date)
                               ? 'bg-gray-100 cursor-not-allowed opacity-60'
                               : 'hover:border-gray-400'
                             }`}
                           value={selectedActions[job.id] || ''}
                           onChange={(e) => handleActionSelect(job.id, e.target.value)}
-                          disabled={new Date() > new Date(job.flow_end_date) || !isSubscribed}
+                          disabled={new Date() > new Date(job.job_end_date) || !isSubscribed}
                         >
                           <option value="">Choose an action</option>
                           <option value="Start">Start</option>
@@ -329,7 +328,7 @@ export default function ViewJobs() {
                           <option value="Pause">Pause</option>
                           <option value="Resume">Resume</option>
                         </select>
-                        {(!isSubscribed || new Date() > new Date(job.flow_end_date)) && (
+                        {(!isSubscribed || new Date() > new Date(job.job_end_date)) && (
                           <div className="absolute top-1/2 -translate-y-1/2 right-8">
                             <Tooltip.Provider>
                               <Tooltip.Root>
@@ -358,12 +357,12 @@ export default function ViewJobs() {
                       <button
                         type="button"
                         className={`btn px-4 py-2 transition-all
-                          ${!selectedActions[job.id] || new Date() > new Date(job.flow_end_date) || !isSubscribed
+                          ${!selectedActions[job.id] || new Date() > new Date(job.job_end_date) || !isSubscribed
                             ? 'btn-secondary bg-gray-100 cursor-not-allowed opacity-60'
                             : 'btn-primary hover:bg-primary-dark'
                           }`}
                         onClick={(e) => handleActionClick(e, job.id)}
-                        disabled={!selectedActions[job.id] || new Date() > new Date(job.flow_end_date) || !isSubscribed}
+                        disabled={!selectedActions[job.id] || new Date() > new Date(job.job_end_date) || !isSubscribed}
                       >
                         Go
                       </button>

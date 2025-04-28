@@ -65,7 +65,7 @@ Options:
 To run the system periodically, add a cron job:
 
 ```bash
-# Run every 15 minutes
+# Run every 15 minutes by default(dynamic option comes later)
 */15 * * * * cd /path/to/project && python run.py
 ```
 

@@ -24,23 +24,19 @@ async function breakText(job_details) {
   });
 
   // Create text chunks with proper string concatenation
-  const title = `Job title and position is : ${job_details.title || ''}`;
-  const location = `The job location is : ${job_details.location || ''}`;
-  const job_type = `The job type is : ${job_details.job_type || ''}`;
-  const salary = `The salary is : ${job_details.salary_min || ''} - ${job_details.salary_max || ''}`;
+  // const title = `Job title and position is : ${job_details.title || ''}`;
+  // const location = `The job location is : ${job_details.location || ''}`;
+  // const job_type = `The job type is : ${job_details.job_type || ''}`;
+  // const salary = `The salary is : ${job_details.salary_min || ''} - ${job_details.salary_max || ''}`;
   
   // Split longer texts
-  const responsibilities = await textSplitter.splitText(`The responsibilities are : ${job_details.responsibilities || ''}`);
-  const qualifications = await textSplitter.splitText(`The qualifications are : ${job_details.qualifications || ''}`);
+  const about = await textSplitter.splitText(`The details about the job are : ${job_details.about || ''}`);
+  const more_details = await textSplitter.splitText(`More details about the job are : ${job_details.more_details || ''}`);
 
   // Create array of all chunks
   const chunks = [
-    title,
-    location,
-    job_type,
-    salary,
-    ...responsibilities,
-    ...qualifications
+    ...about,
+    ...more_details
   ];
 
   console.log("Generated chunks:", chunks);
@@ -117,7 +113,6 @@ export async function uploadVectors(job_details) {
       throw new Error('vectors must be an array');
     }
     
-    // vectors: vectors,       namespace: job_details.id.toString()
     // Upsert vectors into the index with a namespace
     const namespace = job_details.id.toString();
     await index.namespace(namespace).upsert(vectors);

@@ -3,7 +3,6 @@ import json
 from typing import Dict, Any, Optional, Union, List
 from supabase import create_client, Client
 from src.utils import retry_with_backoff
-import src.config as config
 
 class DatabaseService:
     """

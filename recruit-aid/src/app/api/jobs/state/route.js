@@ -1,9 +1,9 @@
-import { getAgentConfig, updateAgentConfig } from '@/lib/agent';
+import { getAgentState, updateAgentState } from '@/lib/agent';
 import { validateCSRFToken } from '@/lib/csrf';
 
 /**
- * GET /api/update-agent-state?id={jobId}
- * Gets the current configuration of a job's agent
+ * GET /api/jobs/state?id={jobId}
+ * Gets the current state of a job's agent
  */
 export async function GET(request) {
   try {
@@ -17,7 +17,7 @@ export async function GET(request) {
       }), { status: 400 });
     }
 
-    const result = await getAgentConfig(jobId);
+    const result = await getAgentState(jobId);
     return new Response(JSON.stringify(result), {
       status: result.success ? 200 : 400
     });
@@ -30,9 +30,9 @@ export async function GET(request) {
 }
 
 /**
- * POST /api/update-agent-state
- * Updates the configuration of a job's agent
- * Body: { jobId: string, config: AgentConfig }
+ * POST /api/jobs/state
+ * Updates the state of a job's agent
+ * Body: { jobId: string, action: string }
  */
 export async function POST(request) {
   try {
@@ -46,16 +46,16 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { jobId, config } = body;
+    const { jobId, action } = body;
 
-    if (!jobId || !config) {
+    if (!jobId || !action) {
       return new Response(JSON.stringify({
         success: false,
-        error: 'Job ID and configuration are required'
+        error: 'Job ID and action are required'
       }), { status: 400 });
     }
 
-    const result = await updateAgentConfig(jobId, config);
+    const result = await updateAgentState(jobId, action);
     return new Response(JSON.stringify(result), {
       status: result.success ? 200 : 400
     });

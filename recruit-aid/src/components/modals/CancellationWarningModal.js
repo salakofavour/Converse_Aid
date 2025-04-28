@@ -30,7 +30,6 @@ export function CancellationWarningModal({ isOpen, onClose, onConfirm, jobCount 
           To prevent job loss:
           <ul className="list-disc ml-6 mt-2">
             <li>Delete specific jobs manually before canceling</li>
-            <li>Export any important job data</li>
             <li>Or keep your subscription active</li>
           </ul>
         </p>

@@ -14,27 +14,27 @@ load_dotenv()
 # --------------------------------------------------------------
 
 # API endpoints and URLs
-GMAIL_URL = "https://gmail.googleapis.com/gmail/v1/users/"
-TOKEN_URL = os.environ.get("TOKEN_URL", "https://oauth2.googleapis.com/token")
+# GMAIL_URL = "https://gmail.googleapis.com/gmail/v1/users/"
+# TOKEN_URL = os.environ.get("TOKEN_URL", "https://oauth2.googleapis.com/token")
 
 # Pinecone settings
-INDEX_NAME = "test1"  # Will be something else, not sure what yet, the name is just too blehh, but it will have to do for now.
+# INDEX_NAME = "test1"  # Will be something else, not sure what yet, the name is just too blehh, but it will have to do for now.
 
 # Retry settings
 MAX_RETRIES = 3
 RETRY_BACKOFF = 2
 
 # Email settings (these could be moved to database in future)
-DEFAULT_RECEIVER = "salakofavour0@gmail.com"
-DEFAULT_SENDER = "favoursalako041@gmail.com"
+# DEFAULT_RECEIVER = "salakofavour0@gmail.com"
+# DEFAULT_SENDER = "favoursalako041@gmail.com"
 
-# For testing/development
-DEFAULT_JOB_ID = "20bcf612-161e-4940-ae81-4ae5728d1e8c"
+ # For testing/development
+# DEFAULT_JOB_ID= "20bcf612-161e-4940-ae81-4ae5728d1e8c"
 
 # LLM settings
-LLM_MODEL = "llama-3.3-70b-versatile"
-LLM_TEMPERATURE = 0
-LLM_MAX_TOKENS = 100
+# LLM_MODEL = "llama-3.3-70b-versatile"
+# LLM_TEMPERATURE = 0
+# LLM_MAX_TOKENS = 100
 
 # Required environment variables
 REQUIRED_ENV_VARS = [
@@ -43,7 +43,14 @@ REQUIRED_ENV_VARS = [
     "SUPABASE_URL", 
     "SUPABASE_KEY",
     "GOOGLE_CLIENT_ID",
-    "GOOGLE_CLIENT_SECRET"
+    "GOOGLE_CLIENT_SECRET",
+    "DEFAULT_JOB_ID",
+    "INDEX_NAME",
+    "TOKEN_URL",
+    "GMAIL_URL",
+    "LLM_MODEL",
+    "LLM_TEMPERATURE",
+    "LLM_MAX_TOKENS"
 ]
 
 def ensure_env_vars() -> bool:

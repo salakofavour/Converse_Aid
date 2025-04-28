@@ -1,9 +1,8 @@
 import os
 import json
 from typing import Dict, Any, List, Optional
-from pinecone.grpc import PineconeGRPC as Pinecone
+from pinecone import Pinecone
 from src.utils import retry_with_backoff
-import src.config as config
 from src.database import db
 
 class VectorSearchService:
@@ -120,7 +119,7 @@ class VectorSearchService:
         Args:
             job_id: Job ID
             text: Text to search for
-            index_name: Name of the index to search (defaults to config)
+            index_name: Name of the index to search (defaults to one in env)
             
         return:
             Dict with search results and context
@@ -131,13 +130,12 @@ class VectorSearchService:
         try:
             # Use default index if none provided
             if not index_name:
-                index_name = config.INDEX_NAME
+                os.environ.get("INDEX_NAME")
                 
             # Embed the text
             embedding = self.embed_text(text)
             
-            #namespace is the job id
-            # job_details = db.get_job_details(config.DEFAULT_JOB_ID)
+            #namespace is the job id, definitely not default one
             job_details = db.get_job_details(job_id)
             namespace = job_details.get('id', "example1")
             # Search using the embedding

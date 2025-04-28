@@ -39,7 +39,6 @@ The `jobs` table has the following structure:
 | qualifications     | TEXT                    | Job qualifications                           |
 | applicants       | JSONB                   | Array of applicant objects                 |
 | status           | TEXT                    | Job status (active, scheduled, closed)     |
-| status_manually_set | BOOLEAN              | Whether status was manually set by user    |
 | created_at       | TIMESTAMP WITH TIME ZONE| Creation timestamp                         |
 | updated_at       | TIMESTAMP WITH TIME ZONE| Last update timestamp                      |
 

@@ -1,16 +1,17 @@
-import { stripe } from '@/lib/stripe';
+import { validateCSRFToken } from '@/lib/csrf';
+import { cancelSubscription } from '@/lib/subscription';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
-    // Verify CSRF protection
-    const requestedWith = request.headers.get('x-requested-with');
-    if (!requestedWith || requestedWith !== 'XMLHttpRequest') {
-      return NextResponse.json(
-        { error: 'Invalid request' },
-        { status: 403 }
-      );
+    // Validate CSRF token
+    const csrfError = await validateCSRFToken(request);
+    if (csrfError) {
+      return NextResponse.json({
+        success: false,
+        error: csrfError
+      }, { status: 403 });
     }
 
     const supabase = createServerClient(
@@ -42,32 +43,14 @@ export async function POST(request) {
       );
     }
 
-    // Get user's subscription
-    const { data: subscription } = await supabase
-      .from('subscriptions')
-      .select('stripe_subscription_id')
-      .eq('user_id', user.id)
-      .single();
+    const result = await cancelSubscription(user.id);
 
-    if (!subscription?.stripe_subscription_id) {
+    if (!result.success) {
       return NextResponse.json(
-        { error: 'No active subscription found' },
-        { status: 404 }
+        { error: result.error },
+        { status: 400 }
       );
     }
-
-    // Cancel the subscription at period end
-    await stripe.subscriptions.update(subscription.stripe_subscription_id, {
-      cancel_at_period_end: true,
-    });
-
-    // Update subscription status in database
-    await supabase
-      .from('subscriptions')
-      .update({
-        status: 'canceled'
-      })
-      .eq('stripe_subscription_id', subscription.stripe_subscription_id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

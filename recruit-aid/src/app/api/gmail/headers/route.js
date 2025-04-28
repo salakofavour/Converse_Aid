@@ -1,40 +1,6 @@
-import { createServerClient } from '@supabase/ssr';
-import { google } from 'googleapis';
-import { cookies } from 'next/headers';
+import { getMessageHeaders, refreshAccessToken } from '@/lib/email';
+import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextResponse } from 'next/server';
-
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
-);
-
-async function createServerSupabaseClient() {
-  const cookieStore = await cookies();
-  
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // The `setAll` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
-        }
-      }
-    }
-  );
-}
 
 export async function GET(request) {
   try {
@@ -64,7 +30,7 @@ export async function GET(request) {
       throw new Error('Failed to fetch profile');
     }
 
-    // Get the first sender's credentials (assuming the first sender is the active one)
+    // Get the first sender's credentials
     const sender = profile.sender[0];
     if (!sender) {
       throw new Error('No sender configured');
@@ -72,64 +38,34 @@ export async function GET(request) {
 
     // Check if token needs refresh
     const now = Date.now();
+    let access_token = sender.access_token;
+    
     if (now >= sender.access_expires_in) {
       // Token expired, refresh it
-      oauth2Client.setCredentials({
-        refresh_token: sender.refresh_token
-      });
-
-      const { credentials } = await oauth2Client.refreshAccessToken();
-      const { access_token, expiry_date } = credentials;
-
-      // Update the sender's access token and expiry
-      const updatedSender = profile.sender.map(s => 
-        s.email === sender.email 
-          ? { ...s, access_token, access_expires_in: expiry_date }
-          : s
-      );
-
-      await supabase
-        .from('profiles')
-        .update({ sender: updatedSender })
-        .eq('id', user.id);
-
-      // Use the new access token
-      oauth2Client.setCredentials({ access_token });
-    } else {
-      // Use existing access token
-      oauth2Client.setCredentials({ access_token: sender.access_token });
+      const refreshResult = await refreshAccessToken(sender.email, sender.refresh_token);
+      if (!refreshResult.success) {
+        throw new Error('Failed to refresh access token');
+      }
+      access_token = refreshResult.access_token;
     }
 
-    // Initialize Gmail API
-    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-
     // Get message headers
-    const response = await gmail.users.messages.get({
-      userId: 'me',
-      id: gmailId,
-      format: 'metadata',
-      metadataHeaders: ['Message-Id', 'References', 'Subject']
-    });
-
-    // Extract headers
-    const headers = response.data.payload.headers;
-    const messageId = headers.find(h => h.name === 'Message-Id')?.value || null;
-    const references = headers.find(h => h.name === 'References')?.value || null;
-    const subject = headers.find(h => h.name === 'Subject')?.value || null;
-    const threadId = response.data.threadId || null;
-
-    console.log("all the headers", headers);
+    const result = await getMessageHeaders(gmailId, access_token);
+    
+    if (!result.success) {
+      throw new Error(result.error);
+    }
 
     return NextResponse.json({
-      messageId,
-      threadId,
-      references,
-      gmailId,
-      subject
+      messageId: result.messageId,
+      threadId: result.threadId,
+      references: result.references,
+      subject: result.subject,
+      gmailId
     });
 
   } catch (error) {
-    console.log('Error fetching Gmail message headers:', error);
+    console.error('Error fetching Gmail message headers:', error);
     return NextResponse.json(
       { error: 'Failed to fetch message headers' },
       { status: 500 }

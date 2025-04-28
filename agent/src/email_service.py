@@ -1,12 +1,14 @@
 import base64
-import json
+import os
 import requests
 from email.message import EmailMessage
 from typing import Dict, Any, Optional, List, Union
 from src.utils import retry_with_backoff
 from src.database import db
 from src.auth import auth_service
-import src.config as config
+import resend
+import sys
+from src.utils import util
 
 class EmailService:
     """
@@ -15,43 +17,6 @@ class EmailService:
     This class provides methods for searching, reading, and sending emails.
     """
     
-    # @retry_with_backoff()
-    # def search_emails(self, job_id: str, search_query: str) -> List[Dict[str, Any]]:
-    #     """
-    #     Search for emails matching a query.
-        
-    #     Args:
-    #         job_id: Job ID to get authentication info
-    #         search_query: Gmail search query string
-            
-    #     return:
-    #         List of matching message dictionaries
-            
-    #     Raises:
-    #         ConnectionError: If Gmail API request fails
-    #     """
-    #     try:
-    #         # Get valid access token
-    #         token_info = auth_service.validate_token(job_id)
-            
-    #         # Set up request headers
-    #         headers = {
-    #             "Authorization": f"Bearer {token_info['access_token']}"
-    #         }
-            
-    #         # Make the API request
-    #         url = f"{config.GMAIL_URL}me/messages?q={search_query}"
-    #         result = requests.get(url, headers=headers)
-            
-    #         if result.status_code != 200:
-    #             raise ConnectionError(f"Gmail API search failed: {result.status_code}")
-            
-    #         # Parse results
-    #         messages = result.json().get('messages', [])
-            
-    #         return messages
-    #     except Exception as e:
-    #         raise
     
     @retry_with_backoff()
     def get_thread(self, job_id: str, thread_id: str) -> Dict[str, Any]:
@@ -80,7 +45,7 @@ class EmailService:
             }
             
             # Make the API request
-            url = f"{config.GMAIL_URL}me/threads/{thread_id}"
+            url = f"{os.environ.get("GMAIL_URL")}me/threads/{thread_id}"
             thread_response = requests.get(url, headers=headers)
             print("thread_response: ", thread_response)
             
@@ -118,7 +83,7 @@ class EmailService:
             }
             
             # Make the API request
-            url = f"{config.GMAIL_URL}me/messages/{gmail_id}"
+            url = f"{os.environ.get("GMAIL_URL")}me/messages/{gmail_id}"
             message_response = requests.get(url, headers=headers)
             
             if message_response.status_code != 200:
@@ -200,7 +165,82 @@ class EmailService:
             }
         except Exception as e:
             raise
-    
+
+    @retry_with_backoff() 
+    def send_first_message(self, job_id: str, applicant: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Send a default message to start the email thread.
+        
+        Args:
+            job_id: Job ID
+            applicant: The details of the applicant
+            
+        return:
+            API response dictionary
+            
+        Raises:
+            ConnectionError: If Gmail API request fails
+        """
+        try:
+            # Get valid access token
+            token_info = auth_service.validate_token(job_id)
+
+            print("token_info: ", token_info)
+            
+            # Set up request headers
+            headers = {
+                "Authorization": f"Bearer {token_info['access_token']}",
+                "Content-Type": "application/json"
+            }
+
+
+            #Get email components , and personalize it
+            job_details = db.get_job_details(job_id)
+            
+            subject = job_details.get('subject', 'Subject')
+            message = job_details.get('default_message', '')
+            applicant_name = applicant["name_email"]["name"]
+            body = message.replace('{{applicant_name}}', applicant_name)
+
+            To = applicant["name_email"]["email"]
+            From = job_details.get('Job_email')
+            
+            # Create email message
+            message = EmailMessage()
+            message.set_content(body)
+            message["To"] = To
+            message["From"] = From
+            message["Subject"] = subject
+            
+            
+            # Encode message
+            raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+            email_data = {
+                "raw": raw
+            }
+            
+            # Send the message
+            url = f"{os.environ.get("GMAIL_URL")}me/messages/send"
+            response = requests.post(url, headers=headers, json=email_data)
+
+            #check if the send limit has been reached, send user a notification email & exit if so
+            send_limit_response = util.check_send_limit(response)
+            if send_limit_response.get("isExceeded"):
+                self.send_user_notification_email(isJob=True, job_id=job_id, message=send_limit_response.get("message"))
+                sys.exit(0);
+
+            print("send reply response: ", response)
+
+            if response.status_code != 200:
+                print(f"Error response body: {response.text}")
+                raise ConnectionError(f"Failed to send email: {response.status_code}")
+            
+            
+            return response.json()
+            
+        except Exception as e:
+            raise
+
     @retry_with_backoff()
     def send_reply(self, job_id: str, applicant_id: str, reply_params: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -250,8 +290,15 @@ class EmailService:
             }
             
             # Send the message
-            url = f"{config.GMAIL_URL}me/messages/send"
+            url = f"{os.environ.get("GMAIL_URL")}me/messages/send"
             response = requests.post(url, headers=headers, json=email_data)
+
+            #check if the send limit has been reached, send user a notification email & exit if so
+            send_limit_response = util.check_send_limit(response)
+            if send_limit_response.get("isExceeded"):
+                self.send_user_notification_email(isJob=True, job_id=job_id, message=send_limit_response.get("message"))
+                sys.exit(0);
+            
             print("send reply response: ", response)
 
             if response.status_code != 200:
@@ -309,8 +356,12 @@ class EmailService:
             #     }
             thread_id = applicant.get("thread_id")
             if not thread_id:
-                raise ValueError("Thread ID not found in applicant record, ensure the user has sent at least one email to the applicant")
-            
+                # raise ValueError("Thread ID not found in applicant record, ensure the user has sent at least one email to the applicant")
+                print("Thread ID not found in applicant record, we will send the initial message")
+                return {
+                "status": "no initial message",
+                "message": "No initial message sent to the applicant"
+                }
             # Get the full thread
             thread = self.get_thread(job_id, thread_id)
             
@@ -348,5 +399,64 @@ class EmailService:
         except Exception as e:
             raise
 
+    @retry_with_backoff() #implementation to send user a notification email I cannot use the email from here to send important/error email. like the refresh_token error, if that is wrong the email sending will also be wrong so wont send
+    #of cousrse i can, the refresh_token and all that is when i want to use the user's email to perform actions. In this I am using the business's email to send emails
+    def send_user_notification_email(self, message: str, applicant_id: str="", job_id: str="", isJob: bool=False) -> Dict[str, Any]:
+        """
+        Send a notification email to the user.
+        
+        Args:
+            message: The message to send to the user
+            applicant_id: The ID of the applicant
+            job_id: The ID of the job
+            isJob: Whether the message is a job message
+        return:
+            API response dictionary
+            
+        Raises:
+            ConnectionError: If Resend request fails
+        """
+        try:
+            applicant_details = db.get_applicant_details(applicant_id)
+            job_details = db.get_job_details(job_id)
+
+            if isJob:
+                email_message = message
+            else:
+                email_message = message.format(applicant_email=applicant_details["name_email"]["email"], subject_title=applicant_details["subject"])
+
+            subject = "Urgent Message from Converse",
+            body = email_message
+
+            To = job_details["email"]
+            From = os.environ.get("EMAIL_FROM")
+            
+            # Create email message
+            message = EmailMessage()
+            message.set_content(body)
+            message["To"] = To
+            message["From"] = From
+            message["Subject"] = subject
+
+            resend.api_key = os.environ.get("RESEND_API_KEY")
+            params: resend.Emails.SendParams = {
+                "from": From,
+                "to": [To],
+                "subject": subject,
+                "html": "<h2>Dear User, </h2>" + "<p>" + body + "</p>",
+            }
+            response = resend.Emails.send(params)
+            print("send reply response: ", response)
+
+            if response.status_code != 200:
+                print(f"Error response body: {response.text}")
+                raise ConnectionError(f"Failed to send email: {response.status_code}")
+            
+            
+            return response.json()
+            
+        except Exception as e:
+            raise
+
 # Create a singleton instance
-email_service = EmailService() 
+email_service = EmailService()

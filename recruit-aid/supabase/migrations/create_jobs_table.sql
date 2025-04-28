@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS "jobs" (
   qualifications TEXT,
   applicants JSONB DEFAULT '[]'::jsonb,
   status TEXT NOT NULL DEFAULT 'active',
-  status_manually_set BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );

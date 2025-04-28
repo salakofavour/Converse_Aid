@@ -4,19 +4,18 @@ import asyncio
 from typing import Dict, Any, Optional, List, Annotated
 from langchain_core.prompts import PromptTemplate
 from langchain_groq import ChatGroq
-from langgraph.checkpoint.memory import MemorySaver
+# from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from typing_extensions import TypedDict
 
-from src.utils import retry_with_backoff
 from src.database import db
 from src.auth import auth_service
 from src.email_service import email_service
 from src.vector_search import vector_search
 import src.config as config
-
+from src.utils import util
 # Initialize memory saver for the graph
 # memory = MemorySaver()
 
@@ -24,6 +23,7 @@ class State(TypedDict):
     """State object used in the graph."""
     email_response: str
     messages: List[Dict[str, Any]]
+
 
 # Function to add messages to the state
 def add_messages_to_state(state: State, messages: List[Dict[str, Any]]) -> State:
@@ -48,7 +48,7 @@ class EmailAutomationApp:
             job_id: The job ID to process (optional, defaults to config)
         """
         # Set up the job ID
-        self.job_id = job_id or config.DEFAULT_JOB_ID
+        self.job_id = job_id or os.environ.get("DEFAULT_JOB_ID")
         self.applicant_id = None  # Will be set during processing of each applicant
         
         # # Set up LLM and graph
@@ -56,42 +56,40 @@ class EmailAutomationApp:
         # self.setup_graph()
         self.graph = None  # Will be set up for each applicant in run()
     
-    def setup_graph(self) -> None:
-        """Set up the LangGraph for message processing."""
+    #normal function, not as a tool. tool = too much hassle
+    def start_message(self) -> str:
+        """
+        function: This is the function used to start the conversation. Message to send is gotten from database.
+            
+        return:
+            A string saying the initial message has been sent on success or failed to send on failure.
+        """
         try:
-            memory = MemorySaver()
-            # Initialize LLM
-            llm = ChatGroq(
-                model=config.LLM_MODEL, 
-                temperature=config.LLM_TEMPERATURE, 
-                max_tokens=config.LLM_MAX_TOKENS, 
-                max_retries=3
-            )
+            # Get applicant details first
+            applicant = db.get_applicant_details(self.applicant_id)
+            if not applicant:
+                raise ValueError(f"No applicant found with ID {self.applicant_id}")
+                
+            # Send the message
+            response = email_service.send_first_message(self.job_id, applicant)
+            print("response from send_first_message: ", response)
             
-            
-            # Define chatbot function
-            def chatbot(state: State):
-                result = llm.invoke(state["messages"])
-                return {"messages": [result]}
-            
-            # Build graph
-            graph_builder = StateGraph(State)
-            graph_builder.add_node("chatbot", chatbot)
-            graph_builder.add_node("create_message", self.create_message)
-            graph_builder.add_node("reply_thread", self.reply_thread)
+            if response: 
+                # Update applicant details with the new message_id
+                message_data = email_service.get_message(self.job_id, response.get("id"))
+                print("message_data from recently sent message: ", message_data)
 
+                db.update_applicant_details(self.applicant_id, {
+                    "message_id": message_data.get("message_id"),
+                    "thread_id": message_data.get("message_id")
+                })
 
-            # add edges
-            graph_builder.add_edge(START, "create_message")
-            graph_builder.add_edge("create_message", "reply_thread")
-            graph_builder.add_edge("reply_thread", END)
-
-            
-            # Compile the graph
-            self.graph = graph_builder.compile(checkpointer=memory)
-            
+                return "Initial Message sent successfully"
+            else:
+                return "Initial Message failed"
+                    
         except Exception as e:
-            raise
+            raise ValueError(f"Error sending initial message: {str(e)}")
 
     def create_message(self, state: State) -> Dict[str, Any]:
         """
@@ -102,9 +100,9 @@ class EmailAutomationApp:
         """
         try:
             llm = ChatGroq(
-                model=config.LLM_MODEL, 
-                temperature=config.LLM_TEMPERATURE, 
-                max_tokens=config.LLM_MAX_TOKENS, 
+                model=os.environ.get("LLM_MODEL"), 
+                temperature=os.environ.get("LLM_TEMPERATURE"), 
+                max_tokens=os.environ.get("LLM_MAX_TOKENS"), 
                 max_retries=3
             )
 
@@ -131,11 +129,15 @@ class EmailAutomationApp:
                 context = search_results["context"]
             else:
                 context = "Your question is not related to the job in question. Please refrain from asking questions that are not related to this role."
+                #send a notification email to the user informing the user that an applicant has asked a question not in KnowledgeBase
+                message = util.notification_message(self.applicant_id, self.job_id, "applicant - {applicant_email} asked a question that is  either not related to the job in question or not in the KnowledgeBase. We continued the conversation but you can check your email with {applicant_email} and subject - {subject_title} to see the question. It is the message before the applicant is informed not to ask questions that are not related to the job in question.")
+                email_service.send_user_notification_email(message)
             
             # Generate response using template
             prompt = PromptTemplate.from_template(
                 """You are a helpful recruiting assistant that responds to applicants within a given context. Given a conversation history of {email_history},
-                    provide a 1-2 paragraph(not more than 2 sentences each, and no breaks between sentences except the paragraph break) well structured response strictly based in the given context. \n"
+                    if email_context is completely a greeting, respond with a complementary greeting & ask how you can help in 2-3 sentences.
+                    else provide a 1-2 paragraph(not more than 2 sentences each, and no breaks between sentences except the paragraph break) well structured response strictly based in the given context. \n"
                     "Context: {context}\n"""
 
             )
@@ -166,7 +168,7 @@ class EmailAutomationApp:
         Tool function: Reply to an email thread.
             
         return:
-            The updated state with the new message
+            The updated state informing the llm that the reply has been sent on success or failed to send on failure.
         """
         try:
             # Get applicant details
@@ -228,6 +230,50 @@ class EmailAutomationApp:
         except Exception as e:
             raise
         
+    def setup_graph(self) -> None:
+        """Set up the LangGraph for message processing."""
+        try:
+            # memory = MemorySaver()
+            # Initialize LLM
+            llm = ChatGroq(
+                model=os.environ.get("LLM_MODEL"), 
+                temperature=os.environ.get("LLM_TEMPERATURE"), 
+                max_tokens=os.environ.get("LLM_MAX_TOKENS"), 
+                max_retries=3
+            )
+            
+            tools = [self.create_message, self.reply_thread]
+            
+            # Define chatbot function with better tool routing
+            def chatbot(state: State): 
+                # use LLM to decide
+                llm_with_tools = llm.bind_tools(tools)
+                result = llm_with_tools.invoke(state["messages"])
+                return {"messages": [result]}
+            
+            # Build graph
+            graph_builder = StateGraph(State)
+            graph_builder.add_node("chatbot", chatbot)
+
+            # Add tool node
+            tool_node = ToolNode(tools)
+            graph_builder.add_node("tools", tool_node)
+
+            # Set up proper conditional edges
+            graph_builder.add_conditional_edges(
+                "chatbot",
+                tools_condition,
+            )
+
+            graph_builder.add_edge(START, "chatbot")
+            graph_builder.add_edge("tools", "chatbot")
+
+            # Compile the graph
+            self.graph = graph_builder.compile()
+            
+        except Exception as e:
+            raise
+
     def stream_graph_updates(self, user_input: str) -> None:
         """
         Process a user input through the graph.
@@ -239,12 +285,12 @@ class EmailAutomationApp:
             if not self.graph:
                 raise ValueError("Graph not initialized")
                 
-            config_data = {
-                "configurable": {
-                    "thread_id": self.applicant_id # thread_id is an expected value, her it is not the email thread id, its just the name of the parameter
-                    # "applicant_id": self.applicant_id
-                }
-            }
+            # config_data = {
+            #     "configurable": {
+            #         "thread_id": self.applicant_id # thread_id is an expected value, her it is not the email thread id, its just the name of the parameter
+            #         # "applicant_id": self.applicant_id
+            #     }
+            # }
                 
             # Initialize state with the user message
             initial_state = {
@@ -259,7 +305,7 @@ class EmailAutomationApp:
             # )
             event = self.graph.invoke(
                 initial_state,
-                config_data,
+                # config_data,
             )
             if "messages" in event and event["messages"]:
                 for message in event["messages"]:
@@ -291,6 +337,13 @@ class EmailAutomationApp:
             Dict with status and results information
         """
         try:
+            # The first step will be to check if the job_id exists in the db, if it does not, return a message saying the job does not exist & delete the schedule
+            if not db.get_job_details(self.job_id):
+                util.delete_schedule(self.job_id)
+                return {
+                    "status": "no_action",
+                    "message": "Job does not exist. Functionality to delete schedule will be added in the future."
+                }
             # Validate authentication tokens
             auth_service.validate_token(self.job_id)
             
@@ -311,16 +364,31 @@ class EmailAutomationApp:
                     
                     # Reset graph for each applicant
                     self.setup_graph()
+                    
 
-                    # Check for new emails for this applicant
+                    # Check for new emails from this applicant
                     email_result = email_service.check_for_new_emails(
                         job_id=self.job_id,
                         applicant_id=applicant['id'],
                         applicant_email=applicant['name_email']['email']
                     )
+
+                    # Check if the applicant has not received an initial message from the user/agent
+                    if email_result["status"] == "no initial message":
+                        print("no initial message, sending initial message")
+
+                        # Directly call the start_message function to send the default initial message
+                        start_message_result = self.start_message()
+                        print("start_message_result: ", start_message_result)
+
+                        results.append({
+                            "applicant_id": applicant['id'],
+                            "email": applicant['name_email']['email'],
+                            "status": "success",
+                            "message": "Sent the default initial message"
+                                })
                     
-                    if email_result["status"] == "new_message":
-                        print("got here")
+                    elif email_result["status"] == "new_message":
                         # Generate a response and Send the reply
                         user_input = "User: Please perform these steps in order: 1. Create one message 2. Send one reply 3. END"
                         self.stream_graph_updates(user_input)

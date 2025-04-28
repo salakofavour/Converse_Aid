@@ -4,7 +4,8 @@ import requests
 from typing import Dict, Any, Optional, Union
 from src.utils import retry_with_backoff
 from src.database import db
-import src.config as config
+# from src.utils import util
+# from src.email_service import email_service
 
 class AuthService:
     """
@@ -14,14 +15,14 @@ class AuthService:
     """
     
     @retry_with_backoff(exceptions=(requests.RequestException, ValueError))
-    def refresh_access_token(self, refresh_token: str, user_id: Dict) -> Dict[str, Any]:
+    def refresh_access_token(self, refresh_token: str, user_id: Dict, job_id: str) -> Dict[str, Any]:
         """
         Refreshes an access token using the refresh token.
         
         Args:
             refresh_token: The refresh token
             user_id: Object containing user_id and Job_email from database query
-            
+            job_id: The current job ID
         return:
             Dict with new access_token and expiration
             
@@ -30,9 +31,6 @@ class AuthService:
             ConnectionError: If token refresh request fails
         """
         try:
-            # refresh_token = "1//0f40aXI5_zf6yCgYIARAAGA8SNwF-L9IrRt7NOda6obJ1gP8xl-7-Y6jUomvfdbNfyWMPTeKcNhvPyXJwAiVugBf_ZQUlzkhQFjg"
-            # "1//04xIzrOD-_Uu5CgYIARAAGAQSNwF-L9Irnvmi88elJOaxbK47FQ6MNhAH-51SNG8Gnhf7ned9kPD0av3BHle4pqymAKYJaaaasm0"
-            # "1//0f40aXI5_zf6yCgYIARAAGA8SNwF-L9IrRt7NOda6obJ1gP8xl-7-Y6jUomvfdbNfyWMPTeKcNhvPyXJwAiVugBf_ZQUlzkhQFjg"
             # Extract the email from the user_id object
             if not isinstance(user_id, dict) and not hasattr(user_id, 'data'):
                 raise ValueError("user_id must be a database result object with data attribute")
@@ -55,23 +53,34 @@ class AuthService:
             }
             print("refresh token payload: ", refresh_token)
             # Send the request
+            token_url = os.environ.get("TOKEN_URL")
+            # print("token_url: ", token_url)
             response = requests.post(
-                config.TOKEN_URL,
+                token_url,
                 data=payload
             )
 
             # Check for errors or invalid refresh token
             if response.status_code != 200:
-                raise ValueError(f"Invalid refresh token: {response.status_code} - {response.text}")
+                #check if the error is due to invalid refresh token and send an email to the user to refresh it if so.
+                if response.text == "invalid_grant":
+                    print("invalid refresh token, informing user")
+                    from src.email_service import email_service
+                    email_service.send_user_notification_email(isJob=True,job_id=job_id, message=f"Your refresh token has expired. Go to settings & then preference tab and then remove and re-authorize the email - {email} to get a new refresh token. All jobs that currently use it to send emails will not be able to proceed with sending emails till this is done.")
+                    
+                    raise ValueError(response.text)
+                else:
+                    print(f"Token refresh failed with status {response.status_code}")
+                    print(f"Response body: {response.text}")
+                    raise ValueError(f"Invalid refresh token: {response.status_code} - {response.text}")
+            
             
             # Parse the response
             response_data = response.json()
             access_token = response_data['access_token']
-            expires_in = response_data['expires_in']
-            access_expires_in = time.time() + expires_in #saves expiry time in seconds
-
-            # print("access_token: ", access_token)
-            # print("access_expires_in: ", access_expires_in.utcnow())
+            expires_in = response_data['expires_in']  # This is in seconds from Google
+            current_time = time.time()
+            access_expires_in = current_time + expires_in  # Adding seconds to current time
 
             # Update the database with the new token
             db.update_access_token(actual_user_id, email, access_token, access_expires_in)
@@ -108,9 +117,12 @@ class AuthService:
             
             # Check if token is valid or needs refreshing
             current_time = time.time()
+
+            
             if (not token_info['access_token'] or 
                 not token_info['access_expires_in'] or 
                 token_info['access_expires_in'] < current_time):
+                
                 
                 # Refresh the token
                 if not token_info['refresh_token']:
@@ -126,7 +138,8 @@ class AuthService:
                     
                 new_token_info = self.refresh_access_token(
                     token_info['refresh_token'], 
-                    mock_user_data
+                    mock_user_data,
+                    job_id
                 )
                 
                 # Update the token info with new values
