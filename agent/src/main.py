@@ -16,6 +16,10 @@ from src.email_service import email_service
 from src.vector_search import vector_search
 import src.config as config
 from src.utils import util
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # Initialize memory saver for the graph
 # memory = MemorySaver()
 
@@ -25,13 +29,13 @@ class State(TypedDict):
     messages: List[Dict[str, Any]]
 
 
-# Function to add messages to the state
-def add_messages_to_state(state: State, messages: List[Dict[str, Any]]) -> State:
-    """Add messages to the state."""
-    if 'messages' not in state:
-        state['messages'] = []
-    state['messages'].extend(messages)
-    return state
+# # Function to add messages to the state
+# def add_messages_to_state(state: State, messages: List[Dict[str, Any]]) -> State:
+#     """Add messages to the state."""
+#     if 'messages' not in state:
+#         state['messages'] = []
+#     state['messages'].extend(messages)
+#     return state
 
 class EmailAutomationApp:
     """
@@ -81,7 +85,8 @@ class EmailAutomationApp:
 
                 db.update_member_details(self.member_id, {
                     "message_id": message_data.get("message_id"),
-                    "thread_id": message_data.get("message_id")
+                    "thread_id": message_data.get("threadId"),
+                    "subject": message_data.get("subject")
                 })
 
                 return "Initial Message sent successfully"
@@ -112,37 +117,59 @@ class EmailAutomationApp:
             # Search for relevant information using the last email's body
             email_body = member.get("body", "")
             print("email_body: ", email_body)
-            receiver = f"hi {member.get('name_email', {}).get('name', '')}"
+            receiver = f"hi {member['name_email']['name']}"
 
             email_context_prompt = PromptTemplate.from_template(
-                """You are a helpful assistant that is given a conversation thread. Your job is to extract the job related context of the last response not starting with {receiver} in a single sentence.
-                    Understand that the context is going to be used for a semantic search, so it needs to semantically represent the last response not starting with {receiver}.
-                   Conversation Thread: {email_history}\n
+                """You are a helpful assistant that is given a conversation thread. 
+                    Your job is to understand the context of the last response not starting with {receiver} in the conversation and extract any question from it in a single sentence.
+                    Understand that the question is going to be answered via a semantic search, so it needs to semantically represent what the last response not starting with {receiver} is about.
+                    Conversation Thread: {email_history}\n
                    """
             )
             email_context = llm.invoke(email_context_prompt.invoke({"email_history": email_body, "receiver": receiver}))
             print("email_context: ", email_context)
-            search_results = vector_search.search_with_text(self.job_id, email_context)
-            # Also provide a summary of the conversation thread in a few sentences.
+            search_results = vector_search.search_with_text(self.job_id, email_context.content)
+            # Also provide a summary of the conversation thread in a few sentences later in the future.
+            print("did the vector search", search_results)
             # Create a prompt with the context
             if search_results["has_relevant_matches"]:
                 context = search_results["context"]
             else:
-                context = "Your question is not related to the job in question. Please refrain from asking questions that are not related to this role."
+                context = "Your question is not related to this conversation. Please refrain from asking questions that are not related to this conversation."
                 #send a notification email to the user informing the user that an member has asked a question not in KnowledgeBase
-                message = util.notification_message(self.member_id, self.job_id, "member - {member_email} asked a question that is  either not related to the job in question or not in the KnowledgeBase. We continued the conversation but you can check your email with {member_email} and subject - {subject_title} to see the question. It is the message before the member is informed not to ask questions that are not related to the job in question.")
-                email_service.send_user_notification_email(message)
+                
+                message = "member - {member_email} asked a question that is  either not related to the job in question or not in the KnowledgeBase. We continued the conversation but you can check your email with {member_email} and subject - {subject_title} to see the question. It is the message before the member is informed not to ask questions that are not related to the job in question."
+                email_service.send_user_notification_email(message, self.member_id, self.job_id)
             
+            print("got here in create_message, mid create message", search_results)
+
             # Generate response using template
+            
             prompt = PromptTemplate.from_template(
-                """You are a helpful recruiting assistant that responds to members within a given context. Given a conversation history of {email_history},
-                    if email_context is completely a greeting, respond with a complementary greeting & ask how you can help in 2-3 sentences.
-                    else provide a 1-2 paragraph(not more than 2 sentences each, and no breaks between sentences except the paragraph break) well structured response strictly based in the given context. \n"
-                    "Context: {context}\n"""
+                """You are a professional and friendly email assistant. Your job is to reply to emails using only the information provided in the "Context" below, which is retrieved from the knowledge base as the. Do not use any other information to answer questions.
+
+                Instructions:
+                - Use the "Conversation History" only to match the tone and flow of the conversation, not for factual content.
+                - If the "email_context" is not a question but a greeting or gratitude, reply with a friendly greeting and ask how you can help as needed.
+                - If the "email_context" is a question, write a clear, concise reply (1-3 short paragraphs) strictly based on the "Context".
+                - Never apologize in your response.
+                - Always end the email with the following footer, visually centered at the bottom if possible (use HTML if allowed, otherwise just place it at the bottom):
+
+                This message was sent with Converse-Aid. Reply to this message to continue conversation.
+
+                Output only the plain text email body, with no HTML or special formatting unless otherwise specified.
+                              
+                    
+                "Context": {context}\n
+                "email_context": {email_context}\n
+                "Conversation History": {email_history}"""
 
             )
-            full_prompt = prompt.invoke({"context": context, "email_history": email_body})
+            #context is the result of the similarity search against the knowledge base
+            full_prompt = prompt.invoke({"context": context, "email_context": email_context, "email_history": email_body})
             
+            print("full_prompt: ", full_prompt)
+
             result = llm.invoke(full_prompt.text)
             response = result.content
             
@@ -150,7 +177,7 @@ class EmailAutomationApp:
             # db.update_member_response(self.member_id, response)
             # Update email response in state
             state["email_response"] = response
-
+            print("got here in create_message, finished create message")
             return{
                 "email_response": response,
                 "messages": state.get("messages", []) +[{
@@ -190,7 +217,7 @@ class EmailAutomationApp:
             #             "tool": None,
             #             "stop": True
             #         }
-            
+            print("got here in reply_thread", member)
             # Prepare reply parameters
             reply_params = {
                 "to": member["name_email"]["email"],
@@ -242,31 +269,36 @@ class EmailAutomationApp:
                 max_retries=3
             )
             
-            tools = [self.create_message, self.reply_thread]
+            # tools = [self.create_message, self.reply_thread]
             
             # Define chatbot function with better tool routing
-            def chatbot(state: State): 
-                # use LLM to decide
-                llm_with_tools = llm.bind_tools(tools)
-                result = llm_with_tools.invoke(state["messages"])
-                return {"messages": [result]}
+            # def chatbot(state: State): 
+            #     # use LLM to decide
+            #     llm_with_tools = llm.bind_tools(tools)
+            #     result = llm_with_tools.invoke(state["messages"])
+            #     return {"messages": [result]}
             
             # Build graph
             graph_builder = StateGraph(State)
-            graph_builder.add_node("chatbot", chatbot)
+            # graph_builder.add_node("chatbot", chatbot)
 
             # Add tool node
-            tool_node = ToolNode(tools)
-            graph_builder.add_node("tools", tool_node)
+            # tool_node = ToolNode(tools)
+            # graph_builder.add_node("tools", tool_node)
+
+            graph_builder.add_node("create_message", self.create_message)
+            graph_builder.add_node("reply_thread", self.reply_thread)
 
             # Set up proper conditional edges
-            graph_builder.add_conditional_edges(
-                "chatbot",
-                tools_condition,
-            )
+            # graph_builder.add_conditional_edges(
+            #     "chatbot",
+            #     tools_condition,
+            # )
 
-            graph_builder.add_edge(START, "chatbot")
-            graph_builder.add_edge("tools", "chatbot")
+            # graph_builder.add_edge(START, "chatbot")
+            graph_builder.add_edge(START, "create_message")
+            graph_builder.add_edge("create_message", "reply_thread")
+            graph_builder.add_edge("reply_thread", END)
 
             # Compile the graph
             self.graph = graph_builder.compile()

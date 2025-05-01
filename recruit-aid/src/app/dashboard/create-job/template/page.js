@@ -11,8 +11,8 @@ export default function JobTemplate() {
     title: '',
     jobStartDate: '',
     jobEndDate: '',
-    responsibilities: '',
-    qualifications: '',
+    about: '',
+    moreDetails: '',
     senderEmail: ''
   });
   
@@ -177,7 +177,7 @@ export default function JobTemplate() {
                   onChange={handleChange}
                   required
                 />
-                <p className="text-xs text-gray-500 mt-1">When the recruitment process begins</p>
+                <p className="text-xs text-gray-500 mt-1">When the job process begins</p>
               </div>
               <div className="transition-all duration-300 ease-in-out">
                 <label htmlFor="jobEndDate" className="block text-gray-700 mb-2">
@@ -197,22 +197,22 @@ export default function JobTemplate() {
                 {dateError && (
                   <p className="text-red-500 text-xs mt-1 animate-pulse">{dateError}</p>
                 )}
-                <p className="text-xs text-gray-500 mt-1">When the recruitment process ends</p>
+                <p className="text-xs text-gray-500 mt-1">When the job process ends</p>
               </div>
             </div>
           </div>
           
           <div className="border-b border-gray-200 pb-6">
-            <h2 className="text-xl font-semibold mb-4">Job Responsibilities*</h2>
+            <h2 className="text-xl font-semibold mb-4">About Job*</h2>
             <div className="space-y-2">
-              <p className="text-sm text-gray-600">Enter each responsibility on a new line. These will be formatted as bullet points.</p>
+              <p className="text-sm text-gray-600">Enter each information on a new line. These will be formatted as bullet points.</p>
               <textarea
-                id="responsibilities"
-                name="responsibilities"
+                id="about"
+                name="about"
                 rows="5"
                 className="form-control focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-all w-full"
-                placeholder="e.g.\nDescribe the job, team, and main responsibilities."
-                value={formData.responsibilities}
+                placeholder="e.g.\nDescribe the job."
+                value={formData.about}
                 onChange={handleChange}
                 required
               ></textarea>
@@ -220,16 +220,16 @@ export default function JobTemplate() {
           </div>
           
           <div className="border-b border-gray-200 pb-6">
-            <h2 className="text-xl font-semibold mb-4">Job Qualifications*</h2>
+            <h2 className="text-xl font-semibold mb-4">More details*</h2>
             <div className="space-y-2">
-              <p className="text-sm text-gray-600">Enter each qualifications on a new line. These will be formatted as bullet points.</p>
+              <p className="text-sm text-gray-600">Enter more details about the job, each on a new line. These will be formatted as bullet points.</p>
               <textarea
-                id="qualifications"
-                name="qualifications"
+                id="moreDetails"
+                name="moreDetails"
                 rows="5"
                 className="form-control focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-all w-full"
-                placeholder="e.g.\nList any requirements, skills, or other important details."
-                value={formData.qualifications}
+                placeholder="e.g. List any extra details about the job."
+                value={formData.moreDetails}
                 onChange={handleChange}
                 required
               ></textarea>
@@ -274,7 +274,7 @@ export default function JobTemplate() {
           <div className="flex justify-end space-x-4">
             <button
               type="button"
-              onClick={() => router.push('/dashboard/create-job')}
+              onClick={() => router.push('/dashboard/view-jobs')}
               className="btn btn-outline-primary transition-all hover:scale-105 hover:shadow-md"
             >
               Cancel

@@ -95,14 +95,14 @@ export async function sendNewEmail({ from, to, subject, content, access_token })
 
     for (const recipient of to) {
       try {
-        const personalizedContent = content.replaceAll('{{recipientName}}', recipient.name || 'Candidate');
+        const personalizedContent = content.replaceAll('{{recipient_Name}}', recipient.name || 'Candidate');
 
         const emailHeaders = [
           'Content-Type: text/html; charset=utf-8',
           'MIME-Version: 1.0',
           `From: ${from}`,
           `To: ${recipient.email}`,
-          'Subject: ' + (subject || 'Job Application'),
+          'Subject: ' + (subject || 'Conversation'),
           '',
           personalizedContent
         ].join('\r\n');
@@ -179,12 +179,12 @@ export async function sendThreadReply({ from, to, content, access_token }) {
           throw new Error('Missing thread information');
         }
 
-        const personalizedContent = content.replaceAll('{{recipientName}}', recipient.name || 'Candidate');
+        const personalizedContent = content.replaceAll('{{recipient_Name}}', recipient.name || 'Candidate');
 
         const references = recipient.referenceId || recipient.messageId;
         const subject = recipient.subject?.startsWith("Re:") ? 
           recipient.subject : 
-          "Re: " + (recipient.subject || "Job Application");
+          "Re: " + (recipient.subject || "Conversation");
 
         const emailHeaders = [
           'Content-Type: text/html; charset=utf-8',

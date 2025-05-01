@@ -46,7 +46,7 @@ export default function InitialMessage() {
     }
 
     const { data, error } = await supabase
-      .from('Jobs')
+      .from('jobs')
       .select('subject, default_message')
       .eq('id', job.id)
       .single();

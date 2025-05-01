@@ -9,6 +9,9 @@ from src.auth import auth_service
 import resend
 import sys
 from src.utils import util
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class EmailService:
     """
@@ -200,7 +203,7 @@ class EmailService:
             subject = job_details.get('subject', 'Subject')
             message = job_details.get('default_message', '')
             member_name = member["name_email"]["name"]
-            body = message.replace('{{member_name}}', member_name)
+            body = message.replace('{{recipient_Name}}', member_name)
 
             To = member["name_email"]["email"]
             From = job_details.get('Job_email')
@@ -223,8 +226,10 @@ class EmailService:
             url = f"{os.environ.get("GMAIL_URL")}me/messages/send"
             response = requests.post(url, headers=headers, json=email_data)
 
-            #check if the send limit has been reached, send user a notification email & exit if so
+            #check if the send limit has been reached, send user a notification email & exit if so.
+            #at this point if successful the message has being sent already
             send_limit_response = util.check_send_limit(response)
+
             if send_limit_response.get("isExceeded"):
                 self.send_user_notification_email(isJob=True, job_id=job_id, message=send_limit_response.get("message"))
                 sys.exit(0);
@@ -425,28 +430,22 @@ class EmailService:
             else:
                 email_message = message.format(member_email=member_details["name_email"]["email"], subject_title=member_details["subject"])
 
-            subject = "Urgent Message from Converse",
+
             body = email_message
 
-            To = job_details["email"]
-            From = os.environ.get("EMAIL_FROM")
+            To = job_details["Job_email"]
+            From = os.environ.get("COMPANY_EMAIL")
             
-            # Create email message
-            message = EmailMessage()
-            message.set_content(body)
-            message["To"] = To
-            message["From"] = From
-            message["Subject"] = subject
 
             resend.api_key = os.environ.get("RESEND_API_KEY")
             params: resend.Emails.SendParams = {
                 "from": From,
                 "to": [To],
-                "subject": subject,
+                "subject": "Urgent Message from Converse-Aid",
                 "html": "<h2>Dear User, </h2>" + "<p>" + body + "</p>",
             }
             response = resend.Emails.send(params)
-            print("send reply response: ", response)
+            print("send user notification email response: ", response)
 
             if response.status_code != 200:
                 print(f"Error response body: {response.text}")

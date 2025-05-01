@@ -219,10 +219,11 @@ export async function updateAgentConfig(jobId, config) {
       throw new Error('Unauthorized to update this job configuration');
     }
 
-    // Don't allow config updates while agent is running
-    if (job.agent_state === AGENT_STATES.RUNNING) {
-      throw new Error('Cannot update configuration while agent is running');
-    }
+    //User can always change the configuration from running, to paused, or resume or stop
+    // // Don't allow config updates while agent is running
+    // if (job.agent_state === AGENT_STATES.RUNNING) {
+    //   throw new Error('Cannot update configuration while agent is running');
+    // }
 
     // Update job config
     const { data: updatedJob, error: updateError } = await supabase

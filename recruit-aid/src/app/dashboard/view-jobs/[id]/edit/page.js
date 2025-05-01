@@ -324,7 +324,7 @@ export default function EditJob() {
             <label htmlFor="about" className="block text-sm font-medium text-gray-700">
               About
             </label>
-            <p className="text-xs text-gray-500">Enter each responsibility on a new line</p>
+            <p className="text-xs text-gray-500">Enter information about the job, each on a new line</p>
             <textarea
               id="about"
               name="about"
@@ -332,7 +332,7 @@ export default function EditJob() {
               onChange={handleChange}
               rows={5}
               className="form-textarea block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
-              placeholder="Enter job responsibilities, one per line"
+              placeholder="Enter job information, one per line"
             ></textarea>
           </div>
           
@@ -340,7 +340,7 @@ export default function EditJob() {
             <label htmlFor="moreDetails" className="block text-sm font-medium text-gray-700">
               More Details
             </label>
-            <p className="text-xs text-gray-500">Enter each requirement on a new line</p>
+            <p className="text-xs text-gray-500">Enter more details about the job, each on a new line</p>
             <textarea
               id="moreDetails"
               name="moreDetails"
@@ -348,7 +348,7 @@ export default function EditJob() {
               onChange={handleChange}
               rows={5}
               className="form-textarea block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
-              placeholder="Enter job qualifications, one per line"
+              placeholder="Enter more details about the job, one per line"
             ></textarea>
           </div>
           

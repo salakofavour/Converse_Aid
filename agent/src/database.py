@@ -3,6 +3,9 @@ import json
 from typing import Dict, Any, Optional, Union, List
 from supabase import create_client, Client
 from src.utils import retry_with_backoff
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class DatabaseService:
     """
@@ -30,7 +33,7 @@ class DatabaseService:
                 raise ValueError("Missing Supabase credentials in environment variables")
                 
             self.client = create_client(
-                os.environ.get("SUPABASE_URL"), 
+                os.environ.get("SUPABASE_URL"),
                 os.environ.get("SUPABASE_KEY")
             )
         except Exception as e:

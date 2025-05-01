@@ -4,6 +4,9 @@ from typing import Dict, Any, List, Optional
 from pinecone import Pinecone
 from src.utils import retry_with_backoff
 from src.database import db
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class VectorSearchService:
     """
@@ -83,10 +86,10 @@ class VectorSearchService:
             ConnectionError: If search fails
         """
         try:
-            # Get the index
-            index = self.client.Index(index_name)
             
-            # Perform the search
+            index = self.client.Index(index_name)
+
+            
             results = index.query(
                 namespace=namespace,
                 vector=vector,
@@ -94,7 +97,6 @@ class VectorSearchService:
                 include_values=False,
                 include_metadata=True,
             )
-            
             # Process the results to extract context
             context = ""
             for match in results.matches:
@@ -110,6 +112,7 @@ class VectorSearchService:
                 "has_relevant_matches": bool(context)
             }
         except Exception as e:
+            print(f"Error in search: {e}")
             raise
     
     def search_with_text(self, job_id: str, text: str, index_name: Optional[str] = None) -> Dict[str, Any]:
@@ -128,17 +131,18 @@ class VectorSearchService:
             Various exceptions based on operations
         """
         try:
-            # Use default index if none provided
+            # Use default index if none provided (note index name is like db name, namespace is like tables(in a sense))
             if not index_name:
-                os.environ.get("INDEX_NAME")
+                index_name = os.environ.get("INDEX_NAME")
                 
             # Embed the text
             embedding = self.embed_text(text)
-            
+            # print("got here in search_with_text, embedding", embedding)
             #namespace is the job id, definitely not default one
             job_details = db.get_job_details(job_id)
             namespace = job_details.get('id', "example1")
             # Search using the embedding
+            # print("got here in search_with_text, namespace", namespace)
             search_results = self.search(index_name, embedding, namespace)
             
             return search_results

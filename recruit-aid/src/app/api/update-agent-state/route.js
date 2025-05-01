@@ -55,6 +55,8 @@ export async function POST(request) {
       }), { status: 400 });
     }
 
+    //request to the api gateway endpoint to initiate or end the agent
+
     const result = await updateAgentConfig(jobId, config);
     return new Response(JSON.stringify(result), {
       status: result.success ? 200 : 400

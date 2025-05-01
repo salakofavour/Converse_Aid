@@ -1,8 +1,6 @@
 'use server'
 
 import { Pinecone } from '@pinecone-database/pinecone';
-import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
-
 
 // Initialize Pinecone client
 const pc = new Pinecone({
@@ -11,36 +9,115 @@ const pc = new Pinecone({
 
 const indexName = process.env.NEXT_PINECONE_INDEX_NAME;
 
-// Function to split input text into chunks
-// Function to split input text into chunks
+// Function to normalize whitespace in text
+function normalizeWhitespace(text) {
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+// Function to determine number of clusters based on text length
+function getDynamicClusterCount(sentences) {
+  // Aim for roughly 200 words per cluster (assuming average 15 words per sentence)
+  const estimatedClusters = Math.ceil(sentences.length / 13);
+  // Keep clusters between 2 and 8
+  return Math.max(2, Math.min(8, estimatedClusters));
+}
+
+// Function to split input text into semantic chunks
 async function breakText(job_details) {
   if (!job_details) {
     throw new Error('job_details is required');
   }
 
-  const textSplitter = new RecursiveCharacterTextSplitter({
-    chunkSize: 200,
-    chunkOverlap: 40
+  // Combine and normalize text
+  const combinedText = normalizeWhitespace(`
+    ${job_details.about || ''} 
+    ${job_details.more_details || ''}
+  `);
+
+  // Split into sentences (simple split by period for now)
+  const sentences = combinedText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+
+  // Get embeddings for sentences using the inference API
+  const embeddings = await pc.inference.embed(
+    "multilingual-e5-large",
+    sentences,
+    {
+      input_type: "passage",
+      truncate: "END"
+    }
+  );
+
+  // Determine number of clusters dynamically
+  const k = getDynamicClusterCount(sentences);
+
+  // Perform k-means clustering
+  const points = embeddings.data.map(e => e.values);
+  const clusters = await kmeans(points, k);
+
+  // Group sentences by cluster
+  const semanticChunks = new Array(k).fill('').map(() => []);
+  clusters.forEach((cluster, idx) => {
+    semanticChunks[cluster].push(sentences[idx]);
   });
 
-  // Create text chunks with proper string concatenation
-  // const title = `Job title and position is : ${job_details.title || ''}`;
-  // const location = `The job location is : ${job_details.location || ''}`;
-  // const job_type = `The job type is : ${job_details.job_type || ''}`;
-  // const salary = `The salary is : ${job_details.salary_min || ''} - ${job_details.salary_max || ''}`;
-  
-  // Split longer texts
-  const about = await textSplitter.splitText(`The details about the job are : ${job_details.about || ''}`);
-  const more_details = await textSplitter.splitText(`More details about the job are : ${job_details.more_details || ''}`);
+  // Join sentences in each cluster
+  const chunks = semanticChunks
+    .map(cluster => cluster.join('. '))
+    .filter(chunk => chunk.length > 0);
 
-  // Create array of all chunks
-  const chunks = [
-    ...about,
-    ...more_details
-  ];
-
-  console.log("Generated chunks:", chunks);
+  console.log("Generated semantic chunks:", chunks);
   return chunks;
+}
+
+// Simple k-means implementation
+async function kmeans(points, k, maxIterations = 10) {
+  const dimensions = points[0].length;
+  
+  // Initialize centroids randomly
+  let centroids = Array(k).fill().map(() => 
+    Array(dimensions).fill().map(() => Math.random())
+  );
+  
+  let labels = new Array(points.length);
+  let iterations = 0;
+  let oldLabels;
+
+  do {
+    oldLabels = [...labels];
+    
+    // Assign points to nearest centroid
+    labels = points.map(point => {
+      const distances = centroids.map(centroid => 
+        euclideanDistance(point, centroid)
+      );
+      return distances.indexOf(Math.min(...distances));
+    });
+    
+    // Update centroids
+    for (let i = 0; i < k; i++) {
+      const clusterPoints = points.filter((_, idx) => labels[idx] === i);
+      if (clusterPoints.length > 0) {
+        centroids[i] = clusterPoints.reduce((acc, point) => 
+          acc.map((val, idx) => val + point[idx])
+        ).map(sum => sum / clusterPoints.length);
+      }
+    }
+    
+    iterations++;
+  } while (iterations < maxIterations && !arraysEqual(labels, oldLabels));
+
+  return labels;
+}
+
+function euclideanDistance(a, b) {
+  return Math.sqrt(
+    a.reduce((sum, val, i) => sum + Math.pow(val - b[i], 2), 0)
+  );
+}
+
+function arraysEqual(a, b) {
+  return a.length === b.length && 
+    a.every((val, idx) => val === b[idx]);
 }
 
 // Function to create pinecone index, connect to it, and upload input chunks as vectors

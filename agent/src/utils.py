@@ -93,7 +93,7 @@ class Util:
     #         "subject": "Urgent Message from Converse",
     #         "from": os.environ.get("EMAIL_FROM")
     #     };
-
+    @staticmethod
     def check_send_limit(response: dict) -> bool:
         """
         Checks if the user has exceeded the daily send limit based on the API response.
@@ -106,7 +106,7 @@ class Util:
         Returns:
              True if the send limit has been reached, False otherwise
         """
-        if response.get("status_code") == 429:
+        if response.status_code == 429:
             message = "You have reached the limit of emails you can send per day. Please try again tomorrow."
             return {
                 "isExceeded": True,
@@ -117,6 +117,7 @@ class Util:
                 "isExceeded": False
             }
 
+    @staticmethod
     def delete_schedule(job_id: str) -> None: #this is not yet defined but the idea is to call this function to delete a schedule(when the api is finished it will also be called here)
         pass
 
