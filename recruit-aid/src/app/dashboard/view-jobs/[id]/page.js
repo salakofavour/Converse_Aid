@@ -4,6 +4,7 @@ import { getJobById, getMembers } from '@/lib/supabase';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { FaFileAlt } from 'react-icons/fa';
 
 export default function JobDetail() {
   const params = useParams();
@@ -203,9 +204,29 @@ export default function JobDetail() {
               </div>
             )}
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-auto">
-            {job.About && (
+          </div>
+          </div>
+
+
+        {/* If file is uploaded, show file icon & name, otherwise show about & more details */}
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <h2 className="text-lg font-semibold mb-4">Knowledge Base</h2>
+
+          {job.file_uploaded ? (
+            <div className="flex flex-col items-center justify-center py-6">
+              <div className="flex items-center space-x-2">
+                <FaFileAlt className="w-6 h-6 text-primary" />
+                <span
+                  className="text-gray-700 max-w-[200px] truncate"
+                  title={job.original_filename}
+                >
+                  {job.original_filename}
+                </span>
+              </div>
+            </div>
+            ) : (
+            // About and More Details sections
+            <>
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-2">About</h3>
                 <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
@@ -217,9 +238,7 @@ export default function JobDetail() {
                   )}
                 </ul>
               </div>
-            )}
             
-            {job.MoreDetails && (
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-2">More Details</h3>
                 <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
@@ -231,10 +250,10 @@ export default function JobDetail() {
                   )}
                 </ul>
               </div>
-            )}
-          </div>
+              </>
+          )}
+
         </div>
-      </div>
       
       {/* Members Table */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">

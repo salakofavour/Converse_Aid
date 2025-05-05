@@ -1,4 +1,5 @@
-import { uploadVectors } from '@/lib/pinecone';
+import { uploadVectors } from '@/lib/info-upload';
+import { deletePineconeNamespace } from '@/lib/pinecone-callRoute';
 import { createClient } from '@/lib/supabase';
 
 /**

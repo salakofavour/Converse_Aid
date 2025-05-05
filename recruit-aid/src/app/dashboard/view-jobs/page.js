@@ -1,7 +1,7 @@
 'use client';
 
 import { JobLimitModal } from '@/components/modals/JobLimitModal';
-import { deletePineconeNamespace } from '@/lib/pinecone';
+import { deletePineconeNamespace } from '@/lib/pinecone-callRoute';
 import { createClient, deleteJob, getJobs, getMembers } from '@/lib/supabase';
 import { TrashIcon } from '@heroicons/react/24/outline';
 import * as Tooltip from '@radix-ui/react-tooltip';
@@ -286,10 +286,24 @@ export default function ViewJobs() {
                   </div>
                   
                   <div className="space-y-2 mb-4">
-                    <div className="flex items-center text-sm">
-                      <span className="text-gray-500 mr-2">About:</span>
-                      <span className="text-gray-700">{truncateAbout(job.about)}</span>
-                    </div>
+                    
+                    {/* If file is uploaded, show file name, otherwise show about preview */}
+                    {job.file_uploaded ? (
+                      <div className="flex items-center text-sm">
+                        <span className="text-gray-500 mr-2">File:</span>
+                        <span
+                          className="text-gray-700 max-w-[120px] truncate"
+                          title={job.original_filename}
+                        >
+                          {job.original_filename}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center text-sm">
+                        <span className="text-gray-500 mr-2">About:</span>
+                        <span className="text-gray-700">{truncateAbout(job.about)}</span>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="flex justify-between items-center pt-3 border-t border-gray-100">

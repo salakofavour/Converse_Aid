@@ -1,6 +1,6 @@
 'use server'
 
-import { deletePineconeNamespace } from '@/lib/pinecone';
+import { deletePineconeNamespaceDirect } from '@/lib/pinecone-deleteFunction';
 import { Pinecone } from '@pinecone-database/pinecone';
 
 // Initialize Pinecone client
@@ -17,10 +17,10 @@ function normalizeWhitespace(text) {
 
 // Function to determine number of clusters based on text length
 function getDynamicClusterCount(sentences) {
-  // Aim for roughly 200 words per cluster (assuming average 15 words per sentence)
-  const estimatedClusters = Math.ceil(sentences.length / 13);
-  // Keep clusters between 2 and 8
-  return Math.max(2, Math.min(8, estimatedClusters));
+  // Aim for roughly 200 words per cluster (assuming average 15 words per sentence) & 6 sentences per cluster
+  const estimatedClusters = Math.ceil(sentences.length / 6);
+  // Keep clusters between 2 and 15
+  return Math.max(2, Math.min(15, estimatedClusters));
 }
 
 // Function to split input text into semantic chunks
@@ -135,7 +135,7 @@ export async function uploadVectors(job_details) {
     console.log('job_details', job_details);
     // First, try to delete the existing namespace
     try {
-      await deletePineconeNamespace(job_details.id.toString());
+      await deletePineconeNamespaceDirect(job_details.id.toString());
     } catch (deleteError) {
       console.error('Error deleting Pinecone namespace:', deleteError);
       throw new Error('Upload was unsuccessful, try again');

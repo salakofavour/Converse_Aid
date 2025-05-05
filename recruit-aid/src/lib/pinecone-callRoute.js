@@ -23,4 +23,4 @@ export async function deletePineconeNamespace(namespaceId) {
     console.error('Error deleting Pinecone namespace:', error);
     throw error;
   }
-} 
+}

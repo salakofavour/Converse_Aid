@@ -1,6 +1,6 @@
 // Account management functions
 
-import { deletePineconeNamespace } from '@/lib/pinecone';
+import { deletePineconeNamespace } from '@/lib/pinecone-callRoute';
 import { stripe } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase';
 import { createServerClient } from '@supabase/ssr';

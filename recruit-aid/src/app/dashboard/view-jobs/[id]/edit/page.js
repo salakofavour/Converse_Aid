@@ -220,7 +220,6 @@ export default function EditJob() {
         more_details: formData.moreDetails,
         Job_email: formData.Job_email,
         status: formData.status,
-        members: formData.members,
         file_uploaded: formData.file_uploaded,
         original_filename: formData.original_filename,
         file_content: ''
