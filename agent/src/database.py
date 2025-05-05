@@ -29,12 +29,12 @@ class DatabaseService:
         """
         try:
             # Ensure we have necessary environment variables
-            if not os.environ.get("SUPABASE_URL") or not os.environ.get("SUPABASE_KEY"):
+            if not os.environ.get("SUPABASE_URL") or not os.environ.get("SUPABASE_SERVICE_ROLE_KEY"):
                 raise ValueError("Missing Supabase credentials in environment variables")
                 
             self.client = create_client(
                 os.environ.get("SUPABASE_URL"),
-                os.environ.get("SUPABASE_KEY")
+                os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
             )
         except Exception as e:
             raise ConnectionError(f"Could not connect to Supabase: {str(e)}")

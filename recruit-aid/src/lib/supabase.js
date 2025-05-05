@@ -60,12 +60,22 @@ export async function createJob(jobData) {
   if (userError) {
     return { error: userError };
   }
-  
-  // Add user_id to the job data
+  console.log('jobData', jobData);
+  let file_content = null;
+  if (jobData.file_content) {
+    file_content = jobData.file_content;
+  }
+  //remove file_content from jobData schema regardless of if there is file content passed or aretText content. It is present in the schema but not in the db.
+  delete jobData.file_content;
+
+  console.log('jobData updated to remove file_content', jobData);
+
   const jobWithUserId = {
     ...jobData,
     user_id: user.id,
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    file_uploaded: jobData.file_uploaded || false,
+    original_filename: jobData.original_filename || null
   };
   
   // Insert the job into the Jobs table
@@ -77,14 +87,28 @@ export async function createJob(jobData) {
 
   if (!error && data) {
     try {
-      // Create vectors in Pinecone
-      await uploadVectors(data);
+      //get the content to upload to pinecone. if file get content from input, if textAreas, upload to db, it dds to what is there already & then take from result of db & upload to pinecone
+      let content_to_upload = null;
+      if (file_content) {
+        content_to_upload = file_content;
+        console.log("with file upload");
+      } else if(jobData.about || jobData.more_details) {
+        content_to_upload = data.about + data.more_details;
+        console.log("with text upload, adding about and more details");
+      }
+
+      //pineconeInfp dict contains all processed info that pinecone needs.
+      let pineconeInfo = {
+        id: data.id,
+        content_to_upload: content_to_upload  
+      }
+      // create vectors in Pinecone
+      await uploadVectors(pineconeInfo);
     } catch (pineconeError) {
-      console.error('Error creating Pinecone vectors:', pineconeError);
-      // Don't throw the error as the DB insert was successful
+      console.error('Error updating Pinecone vectors:', pineconeError);
+      // Don't throw the error as the DB update was successful
     }
   }
-  
   return { job: data, error };
 }
 
@@ -121,9 +145,17 @@ export async function getJobById(jobId) {
   return { job: data, error };
 }
 
+//the current implementation here is not complete. First there is no need updatting the vector db
+//with the full info from db . only update should be done to the vector db when the user updates 
+//the file or about & more details sections of the job. 
 export async function updateJob(jobId, jobData) {
   const supabase = createClient();
   
+  let file_content = null;
+  if (jobData.file_content) {
+    file_content = jobData.file_content;
+    delete jobData.file_content;
+  }
   // Update the job
   const { data, error } = await supabase
     .from('jobs')
@@ -132,10 +164,23 @@ export async function updateJob(jobId, jobData) {
     .select()
     .single();
   
-  if (!error && data && !jobData.subject && !jobData.default_message) {
+  if (!error && data) {
     try {
-      // Update vectors in Pinecone
-      await uploadVectors(data);
+      //get the content to upload to pinecone. if file get content from input, if textAreas, upload to db, it dds to what is there already & then take from result of db & upload to pinecone
+      let content_to_upload = null;
+      if (file_content) {
+        content_to_upload = file_content;
+      } else if(jobData.about || jobData.more_details) {
+        content_to_upload = data.about + data.more_details;
+      }
+
+      //pineconeInfp dict contains all processed info that pinecone needs.
+      let pineconeInfo = {
+        id: jobId,
+        content_to_upload: content_to_upload  
+      }
+      // create vectors in Pinecone
+      await uploadVectors(pineconeInfo);
     } catch (pineconeError) {
       console.error('Error updating Pinecone vectors:', pineconeError);
       // Don't throw the error as the DB update was successful

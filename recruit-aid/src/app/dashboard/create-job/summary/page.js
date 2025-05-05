@@ -1,226 +1,184 @@
 'use client';
 
 import { createJob } from '@/lib/supabase';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-
+import { FaFileAlt } from 'react-icons/fa';
+import { toast } from 'sonner';
 
 export default function JobSummary() {
   const router = useRouter();
-  const [jobData, setJobData] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [formData, setFormData] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState(null);
-  
-  // Load job data from localStorage
+  const [selectedFile, setSelectedFile] = useState(null);
+
   useEffect(() => {
-    const storedJobData = localStorage.getItem('jobFormData');
-    if (storedJobData) {
-      try {
-        const parsedJobData = JSON.parse(storedJobData);
-        setJobData(parsedJobData);
-      } catch (error) {
-        console.error('Error parsing job data from localStorage:', error);
-        setError('Failed to load job data. Please go back and try again.');
+    // Get form data from localStorage
+    const savedData = localStorage.getItem('jobFormData');
+    if (savedData) {
+      const parsedData = JSON.parse(savedData);
+      setFormData(parsedData);
+      
+      // If there's a file in sessionStorage, retrieve it
+      if (parsedData.file_uploaded) {
+        const fileData = sessionStorage.getItem('selectedFile');
+        if (fileData) {
+          if (fileData.startsWith('data:')) {
+            // DataURL: use utility to extract content
+            setSelectedFile({ dataUrl: fileData, fileName: parsedData.fileName });
+          } else {
+            // Plain text: just use the string
+            setSelectedFile({ text: fileData, fileName: parsedData.fileName });
+          }
+        }
       }
-    } else {
-      setError('No job data found. Please go back and fill in the job details.');
     }
-    setIsLoading(false);
   }, []);
-  
-  // Format date for display
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const options = { year: 'numeric', month: 'long', day: 'numeric' };
-    return new Date(dateString).toLocaleDateString(undefined, options);
-  };
-  
-  // Convert text to bullet points
-  const formatBulletPoints = (text) => {
-    if (!text) return [];
-    return text.split('\n').filter(line => line.trim() !== '').map(line => line.trim());
-  };
-  
-  // Handle form submission
+
   const handleSubmit = async () => {
-    if (!jobData) {
-      setError('No job data found. Please go back and fill in the job details.');
-      return;
-    }
+    if (!formData) {console.log('no form data'); return;}
+
+    console.log('formData', formData);
     
     setIsSubmitting(true);
-    setError(null);
-    
+    console.log('submitting usestate');
     try {
-      // Determine status based on end date only
-      const currentDate = new Date();
-      const endDate = new Date(jobData.jobEndDate);
-      const status = currentDate <= endDate ? 'active' : 'closed';
-      
-      // Prepare job data for submission
-      const supabaseJobData = {
-        title: jobData.title,
-        job_email: jobData.senderEmail,
-        status: status
+      let jobData = {
+        title: formData.title,
+        job_start_date: formData.jobStartDate,
+        job_end_date: formData.jobEndDate,
+        Job_email: formData.senderEmail,
+        file_uploaded: formData.file_uploaded,
+        original_filename: formData.fileName || null,
+        about: formData.about,
+        more_details: formData.moreDetails,
+        file_content: ''
       };
-      
-      // Save to Supabase
-      const { job, error: saveError } = await createJob(supabaseJobData);
-      
-      if (saveError) {
-        throw new Error(saveError.message);
+
+      // If using file, extract content
+      if (formData.file_uploaded && selectedFile) {
+        let content, error;
+        if (selectedFile.dataUrl) {
+          // Use the utility for DataURL
+          ({ content, error } = await dataURLToFileContent(selectedFile.dataUrl, selectedFile.fileName));
+        } else if (selectedFile.text) {
+          // Use the plain text directly
+          content = selectedFile.text;
+          error = null;
+        }
+        if (error) {
+          toast.error('Failed to process file: ' + error);
+          setIsSubmitting(false);
+          return;
+        }
+        jobData.file_content = content;
+      }else {
+        // Using text areas
+        jobData.about = formData.about;
+        jobData.more_details = formData.moreDetails;
       }
+      console.log('initiating createJob with');
+      const { job, error } = await createJob(jobData);
+      console.log('job created');
       
-      // Clear localStorage
+
+      if (error) {
+        throw error;
+      }
+
+      // Clear storage
       localStorage.removeItem('jobFormData');
-      
-      // Navigate to view-jobs page
+      sessionStorage.removeItem('selectedFile');
+
+      // Redirect to jobs page
       router.push('/dashboard/view-jobs');
-      
-    } catch (err) {
-      console.error('Error creating job:', err);
-      setError(err.message || 'An error occurred while creating the job');
+      toast.success('Job created successfully!');
+    } catch (error) {
+      console.error('Error creating job:', error);
+      toast.error('Failed to create job: ' + error.message);
     } finally {
       setIsSubmitting(false);
     }
   };
-  
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-pulse flex flex-col items-center">
-          <div className="rounded-full bg-primary-light h-12 w-12 mb-4"></div>
-          <div className="text-gray-600">Loading job summary...</div>
-        </div>
-      </div>
-    );
-  }
-  
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Job Summary</h1>
-          <Link href="/dashboard/create-job/template" className="btn btn-outline-primary transition-all hover:shadow-md">
-            Back to Template
-          </Link>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow-custom p-6">
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
-            <span className="block sm:inline">{error}</span>
-          </div>
-          
-          <div className="flex justify-center mt-6">
-            <Link href="/dashboard/create-job/template" className="btn btn-primary">
-              Go Back to Template
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  
-  if (!jobData) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Job Summary</h1>
-          <Link href="/dashboard/create-job/template" className="btn btn-outline-primary transition-all hover:shadow-md">
-            Back to Template
-          </Link>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow-custom p-6">
-          <div className="text-center py-12">
-            <div className="text-gray-500 mb-4">No job data found</div>
-            <Link href="/dashboard/create-job/template" className="btn btn-primary">
-              Go Back to Template
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Job Summary</h1>
-        <Link href="/dashboard/create-job/template" className="btn btn-outline-primary transition-all hover:shadow-md">
-          Back to Template
-        </Link>
-      </div>
 
-      <div className="bg-white rounded-lg shadow-custom p-6 transition-all hover:shadow-lg">
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
-            <span className="block sm:inline">{error}</span>
-          </div>
-        )}
-        
-        <div className="space-y-8">
-          <div className="border-b border-gray-200 pb-6">
-            <h2 className="text-xl font-semibold mb-4">Job Overview</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-gray-500 text-sm font-medium mb-1">Job Title</h3>
-                <p className="text-gray-900">{jobData.title}</p>
-              </div>
-              <div>
-                <h3 className="text-gray-500 text-sm font-medium mb-1">Recruitment Timeline</h3>
-                <p className="text-gray-900">{formatDate(jobData.jobStartDate)} to {formatDate(jobData.jobEndDate)}</p>
-              </div>
+  if (!formData) {
+    return <div>Loading...</div>;
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto py-10">
+      <h1 className="text-2xl font-bold mb-6">Review Job Details</h1>
+      <div className="bg-white rounded-lg shadow-custom p-6">
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <h3 className="font-semibold">Job Title</h3>
+              <p>{formData.title}</p>
+            </div>
+            <div>
+              <h3 className="font-semibold">Sender Email</h3>
+              <p>{formData.senderEmail}</p>
+            </div>
+            <div>
+              <h3 className="font-semibold">Start Date</h3>
+              <p>{new Date(formData.jobStartDate).toLocaleDateString()}</p>
+            </div>
+            <div>
+              <h3 className="font-semibold">End Date</h3>
+              <p>{new Date(formData.jobEndDate).toLocaleDateString()}</p>
             </div>
           </div>
-          
-          <div className="border-b border-gray-200 pb-6">
-            <h2 className="text-xl font-semibold mb-4">About the Role</h2>
-            <p className="text-gray-700">
-              We're looking for a {jobData.title} to join our team
-            </p>
-          </div>
-          
-          <div className="border-b border-gray-200 pb-6">
-            <h2 className="text-xl font-semibold mb-4">About</h2>
-            <ul className="list-disc pl-5 space-y-2 text-gray-700">
-              {formatBulletPoints(jobData.about).map((point, index) => (
-                <li key={index}>{point}</li>
-              ))}
-            </ul>
-          </div>
-          
-          <div className="border-b border-gray-200 pb-6">
-            <h2 className="text-xl font-semibold mb-4">More Details</h2>
-            <ul className="list-disc pl-5 space-y-2 text-gray-700">
-              {formatBulletPoints(jobData.moreDetails).map((point, index) => (
-                <li key={index}>{point}</li>
-              ))}
-            </ul>
-          </div>
-          
-          <div className="flex justify-end space-x-4 pt-4">
-            <Link
-              href="/dashboard/create-job/template"
-              className="btn btn-outline-primary transition-all hover:scale-105 hover:shadow-md"
-            >
-              Back
-            </Link>
+
+          {formData.file_uploaded ? (
+            <div className="border-t pt-4">
+              <h3 className="font-semibold mb-2">Knowledge Base Source</h3>
+              <div className="flex items-center space-x-2 p-4 bg-gray-50 rounded-lg">
+                <FaFileAlt className="w-6 h-6 text-primary" />
+                <span>{formData.fileName}</span>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="border-t pt-4">
+                <h3 className="font-semibold">About Job</h3>
+                <div className="whitespace-pre-wrap bg-gray-50 p-4 rounded-lg mt-2">
+                  {formData.about}
+                </div>
+              </div>
+              <div className="border-t pt-4">
+                <h3 className="font-semibold">More Details</h3>
+                <div className="whitespace-pre-wrap bg-gray-50 p-4 rounded-lg mt-2">
+                  {formData.moreDetails}
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="flex justify-end space-x-4 pt-6">
             <button
               type="button"
-              className="btn btn-primary transition-all hover:scale-105 hover:shadow-md"
+              onClick={() => router.back()}
+              className="btn btn-outline-primary"
+              disabled={isSubmitting}
+            >
+              Back
+            </button>
+            <button
+              type="button"
               onClick={handleSubmit}
+              className="btn btn-primary"
               disabled={isSubmitting}
             >
               {isSubmitting ? (
-                <>
-                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                  Saving...
-                </>
+                <div className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Processing...
+                </div>
               ) : (
-                'Finish'
+                'Save Job'
               )}
             </button>
           </div>

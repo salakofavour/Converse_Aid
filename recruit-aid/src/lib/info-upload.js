@@ -1,5 +1,6 @@
 'use server'
 
+import { deletePineconeNamespace } from '@/lib/pinecone';
 import { Pinecone } from '@pinecone-database/pinecone';
 
 // Initialize Pinecone client
@@ -23,21 +24,19 @@ function getDynamicClusterCount(sentences) {
 }
 
 // Function to split input text into semantic chunks
-async function breakText(job_details) {
-  if (!job_details) {
-    throw new Error('job_details is required');
+async function breakText(content) {
+  if (!content) {
+    throw new Error('content is required');
   }
 
-  // Combine and normalize text
-  const combinedText = normalizeWhitespace(`
-    ${job_details.about || ''} 
-    ${job_details.more_details || ''}
-  `);
+  const text = normalizeWhitespace(`${content || ''}`);
+  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
 
-  // Split into sentences (simple split by period for now)
-  const sentences = combinedText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  if (!sentences.length) {
+    throw new Error('No valid sentences found in input text.');
+  }
 
-  // Get embeddings for sentences using the inference API
+  // Get embeddings for sentences
   const embeddings = await pc.inference.embed(
     "multilingual-e5-large",
     sentences,
@@ -47,25 +46,35 @@ async function breakText(job_details) {
     }
   );
 
-  // Determine number of clusters dynamically
   const k = getDynamicClusterCount(sentences);
-
-  // Perform k-means clustering
   const points = embeddings.data.map(e => e.values);
   const clusters = await kmeans(points, k);
 
-  // Group sentences by cluster
-  const semanticChunks = new Array(k).fill('').map(() => []);
+  // Group sentences and their embeddings by cluster
+  const semanticChunks = new Array(k).fill(null).map(() => []);
+  const semanticVectors = new Array(k).fill(null).map(() => []);
+
   clusters.forEach((cluster, idx) => {
     semanticChunks[cluster].push(sentences[idx]);
+    semanticVectors[cluster].push(points[idx]);
   });
 
-  // Join sentences in each cluster
+  // For each chunk, join sentences and average their vectors
   const chunks = semanticChunks
-    .map(cluster => cluster.join('. '))
-    .filter(chunk => chunk.length > 0);
+    .map((cluster, i) => {
+      if (cluster.length === 0) return null;
+      // Average the vectors for this chunk
+      const vectors = semanticVectors[i];
+      const avgVector = vectors[0].map((_, dim) =>
+        vectors.reduce((sum, vec) => sum + vec[dim], 0) / vectors.length
+      );
+      return {
+        text: cluster.join('. '),
+        values: avgVector
+      };
+    })
+    .filter(Boolean);
 
-  console.log("Generated semantic chunks:", chunks);
   return chunks;
 }
 
@@ -123,6 +132,15 @@ function arraysEqual(a, b) {
 // Function to create pinecone index, connect to it, and upload input chunks as vectors
 export async function uploadVectors(job_details) {
   try {
+    console.log('job_details', job_details);
+    // First, try to delete the existing namespace
+    try {
+      await deletePineconeNamespace(job_details.id.toString());
+    } catch (deleteError) {
+      console.error('Error deleting Pinecone namespace:', deleteError);
+      throw new Error('Upload was unsuccessful, try again');
+    }
+
     // Check if index exists, if not create it
     const indexList = await pc.listIndexes();
     const indexes = indexList["indexes"]
@@ -151,38 +169,14 @@ export async function uploadVectors(job_details) {
     // Connect to the index
     const index = pc.index(indexName);
 
-    // Split text into chunks
-    const docSplits = await breakText(job_details);
-
-    // Create data array with IDs and text
-    const data = docSplits.map((text, i) => ({
-      id: i.toString(),
-      text: text
-    }));
-
-
-    // Get embeddings using the inference API
-    try{
-      const model = "multilingual-e5-large";
-      const input = data.map(d => d.text);
-
-    var embeddings = await pc.inference.embed(
-      model,
-      input,
-      {
-        input_type: "passage", truncuate:"END"
-      }
-    );
-    console.log("embeddings", embeddings);
-  } catch (error) {
-    console.error('Error in creating embeddings:', error);
-    throw error;
-  }
+    // assign embedded chuncks to variable (breakText already splits texts, embeds them into vectors, group similar vectors & returns the chunks)
+    const data = await breakText(job_details.content_to_upload);
+    
 
     // Create vectors for upserting
     const vectors = data.map((d, i) => ({
-      id: d.id,
-      values: embeddings.data[i].values,
+      id: i.toString(),
+      values: d.values,
       metadata: { text: d.text }
     }));
 
@@ -196,7 +190,7 @@ export async function uploadVectors(job_details) {
 
     return true;
   } catch (error) {
-    // console.error('Error in uploadVectors:', error);
-    throw new Error(error);
+    console.error('Error in uploadVectors:', error);
+    throw error;
   }
 }

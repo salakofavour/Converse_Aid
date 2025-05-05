@@ -1,5 +1,5 @@
+import { endAgent, initiateAgent } from '@/lib/aws-agent-call';
 import { createClient } from '@/lib/supabase';
-
 /**
  * Valid agent states
  */
@@ -108,7 +108,18 @@ export async function updateAgentState(jobId, action) {
       throw new Error(`Invalid state transition from ${currentState} to ${actionConfig.state}`);
     }
 
-    // Update job state
+    //after validating state change is valid & correct parameters are provided, send a request to the api gateway endpoint to initiate or end the agent
+    //send the job id, and the action to initiate or end the agent
+    //if the action is to start or resume the agent, end any agent with the same name first and then initiate the agent
+    //if the action is to stop or pause the agent, end the agent
+    if (actionConfig.state === AGENT_STATES.RUNNING) {
+      await endAgent(jobId);
+      await initiateAgent(jobId);
+    } else if (actionConfig.state === AGENT_STATES.STOPPED || actionConfig.state === AGENT_STATES.PAUSED) {
+      await endAgent(jobId);
+    }
+
+    // Update job state in db
     const { data: updatedJob, error: updateError } = await supabase
       .from('jobs')
       .update({ agent_state: actionConfig.state })
@@ -143,106 +154,3 @@ function isValidStateTransition(currentJobStatus, newAgentState) {
   // Check if transition is allowed
   return allowedTransitions.includes(newAgentState);
 }
-
-/**
- * Gets the agent configuration for a job
- * @param {string} jobId - The job ID
- * @returns {Promise<{ success: boolean, config?: Object, error?: string }>}
- */
-export async function getAgentConfig(jobId) {
-  try {
-    const supabase = createClient();
-
-    // Get job to verify ownership and get config
-    const { data: job, error: jobError } = await supabase
-      .from('jobs')
-      .select(`
-        id,
-        user_id,
-        job_start_date,
-        job_end_date,
-        agent_config
-      `)
-      .eq('id', jobId)
-      .single();
-
-    if (jobError) throw new Error('Failed to get job');
-
-    // Verify ownership
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError) throw new Error('Failed to get user');
-
-    if (job.user_id !== user.id) {
-      throw new Error('Unauthorized to view this job configuration');
-    }
-
-    return {
-      success: true,
-      config: {
-        jobStartDate: job.job_start_date,
-        jobEndDate: job.job_end_date,
-        ...job.agent_config
-      }
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}
-
-/**
- * Updates the agent configuration for a job
- * @param {string} jobId - The job ID
- * @param {Object} config - The agent configuration
- * @returns {Promise<{ success: boolean, config?: Object, error?: string }>}
- */
-export async function updateAgentConfig(jobId, config) {
-  try {
-    const supabase = createClient();
-
-    // Get job to verify ownership
-    const { data: job, error: jobError } = await supabase
-      .from('jobs')
-      .select('user_id, agent_state')
-      .eq('id', jobId)
-      .single();
-
-    if (jobError) throw new Error('Failed to get job');
-
-    // Verify ownership
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError) throw new Error('Failed to get user');
-
-    if (job.user_id !== user.id) {
-      throw new Error('Unauthorized to update this job configuration');
-    }
-
-    //User can always change the configuration from running, to paused, or resume or stop
-    // // Don't allow config updates while agent is running
-    // if (job.agent_state === AGENT_STATES.RUNNING) {
-    //   throw new Error('Cannot update configuration while agent is running');
-    // }
-
-    // Update job config
-    const { data: updatedJob, error: updateError } = await supabase
-      .from('jobs')
-      .update({ agent_config: config })
-      .eq('id', jobId)
-      .select()
-      .single();
-
-    if (updateError) throw new Error('Failed to update job configuration');
-
-    return {
-      success: true,
-      config: updatedJob.agent_config
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-} 

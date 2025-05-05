@@ -56,30 +56,3 @@ export async function sendPaymentFailedNotification(userEmail) {
     throw error;
   }
 }
-
-// export async function sendSubscriptionEndingNotification(userEmail, daysRemaining, jobCount) {
-//   try {
-//     await resend.emails.send({
-//       from: process.env.NEXT_FROM_EMAIL,
-//       to: userEmail,
-//       subject: `Subscription Ending in ${daysRemaining} Days`,
-//       html: `
-//         <h2>Your Converse-Aid Subscription is Ending Soon</h2>
-//         <p>Your subscription will expire in ${daysRemaining} days.</p>
-//         ${jobCount > 5 ? `
-//         <p>You currently have ${jobCount} jobs. When your subscription expires, only your 5 most recent jobs will be retained. The remaining ${jobCount - 5} jobs will be permanently deleted.</p>
-//         <p>To keep all your jobs and maintain access to Pro features, please renew your subscription:</p>
-//         <ol>
-//           <li>Log in to your Converse-Aid account</li>
-//           <li>Go to Settings > Preferences</li>
-//           <li>Click on "Renew Subscription"</li>
-//         </ol>
-//         ` : ''}
-//         <p>If you need assistance, please don't hesitate to contact our support team.</p>
-//       `,
-//     });
-//   } catch (error) {
-//     console.error('Failed to send subscription ending notification:', error);
-//     throw error;
-//   }
-// } 

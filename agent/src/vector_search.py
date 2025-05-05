@@ -140,7 +140,7 @@ class VectorSearchService:
             # print("got here in search_with_text, embedding", embedding)
             #namespace is the job id, definitely not default one
             job_details = db.get_job_details(job_id)
-            namespace = job_details.get('id', "example1")
+            namespace = job_details.get('id', "") #no default namespace for now. I will add a universal default one later.
             # Search using the embedding
             # print("got here in search_with_text, namespace", namespace)
             search_results = self.search(index_name, embedding, namespace)

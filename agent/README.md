@@ -43,7 +43,7 @@ The system is organized into modular components:
    GROQ_API_KEY=your_groq_key
    PINECONE_API_KEY=your_pinecone_key
    SUPABASE_URL=your_supabase_url
-   SUPABASE_KEY=your_supabase_key
+   SUPABASE_SERVICE_ROLE_KEY=your_SUPABASE_SERVICE_ROLE_KEY
    GOOGLE_CLIENT_ID=your_google_client_id
    GOOGLE_CLIENT_SECRET=your_google_client_secret
    TOKEN_URL=https://oauth2.googleapis.com/token

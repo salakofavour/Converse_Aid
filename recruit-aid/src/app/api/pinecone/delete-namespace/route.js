@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
+    console.log('Api being hit')
     const { namespaceId } = await request.json();
 
     if (!namespaceId) {
@@ -26,17 +27,18 @@ export async function POST(request) {
     try {
       const namespace = index.namespace(namespaceId)
       await namespace.deleteAll();
-      
+      console.log('namespace deleted')
       return NextResponse.json({ success: true });
     } catch (deleteError) {
       // If namespace doesn't exist, consider it a success since the end goal is achieved
-      if (deleteError.message?.includes('Namespace not found')) {
+      console.log('deleteError in api route', deleteError.message);
+      if (deleteError.message?.includes('NamespaceNotFoundError') || deleteError.message?.includes('404') || deleteError.message?.includes('namespace does not exist')) {
         return NextResponse.json({ 
           success: true,
           message: 'Namespace already deleted or does not exist'
         });
       }
-      throw deleteError; // Re-throw other errors
+      throw deleteError; // handle any other errors
     }
 
   } catch (error) {
