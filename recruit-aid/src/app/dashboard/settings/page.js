@@ -36,6 +36,7 @@ export default function Settings() {
   const [showEmailChangeModal, setShowEmailChangeModal] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('');
+  const [changeConfirmEmail, setChangeConfirmEmail] = useState('');
   const [securityError, setSecurityError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const processedCodeRef = useRef(null);
@@ -404,13 +405,13 @@ export default function Settings() {
   };
 
   const handleEmailChange = async () => {
-    if (!deleteConfirmEmail) {
+    if (!changeConfirmEmail) {
       setSecurityError('Please enter your email to confirm');
       return;
     }
 
-    if (deleteConfirmEmail !== profileData.email) {
-      setSecurityError('Email does not match');
+    if (changeConfirmEmail == profileData.email) {
+      setSecurityError('Email is the same as the current one');
       return;
     }
 
@@ -418,12 +419,12 @@ export default function Settings() {
     setSecurityError('');
 
     try {
-      const response = await fetchWithCSRF('/api/auth/email', {
+      const response = await fetchWithCSRF('/api/account/change-email', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email: deleteConfirmEmail }),
+        body: JSON.stringify({ newEmail: changeConfirmEmail }),
       });
 
       if (!response.ok) {
@@ -433,7 +434,7 @@ export default function Settings() {
 
       toast.success('Email change request sent. Please check your inbox.');
       setShowEmailChangeModal(false);
-      setDeleteConfirmEmail('');
+      setChangeConfirmEmail('');
     } catch (err) {
       console.error('Error changing email:', err);
       setSecurityError(err.message || 'Failed to change email. Please try again.');
@@ -457,7 +458,7 @@ export default function Settings() {
     setSecurityError('');
 
     try {
-      const response = await fetchWithCSRF('/api/auth/account', {
+      const response = await fetchWithCSRF('/api/account/delete', {
         method: 'DELETE',
       });
 
@@ -933,7 +934,7 @@ export default function Settings() {
                   </h3>
                   <div className="mt-2">
                     <p className="text-sm text-gray-500">
-                      Please enter your current email address to confirm the change.
+                      Please enter the new email address you want to use.
                     </p>
                   </div>
                 </div>
@@ -948,10 +949,10 @@ export default function Settings() {
                     <input
                       type="email"
                       id="confirm-email"
-                      value={deleteConfirmEmail}
-                      onChange={(e) => setDeleteConfirmEmail(e.target.value)}
+                      value={changeConfirmEmail}
+                      onChange={(e) => setChangeConfirmEmail(e.target.value)}
                       className="mt-1 focus:ring-primary focus:border-primary block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                      placeholder="Enter your current email"
+                      placeholder="Enter the new email"
                     />
                     {securityError && (
                       <p className="mt-2 text-sm text-red-600">{securityError}</p>
@@ -972,7 +973,7 @@ export default function Settings() {
                     type="button"
                     onClick={() => {
                       setShowEmailChangeModal(false);
-                      setDeleteConfirmEmail('');
+                      setChangeConfirmEmail('');
                       setSecurityError('');
                     }}
                     className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary sm:mt-0 sm:col-start-1 sm:text-sm"

@@ -2,7 +2,9 @@ import { validateCSRFToken } from '@/lib/csrf';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { NextResponse } from 'next/server';
 
-export async function POST(request) {
+
+//using a put and not a post because I am not creating a new entry but updating the existing email
+export async function PUT(request) {
   try {
     const csrfError = await validateCSRFToken(request);
     if (csrfError) {

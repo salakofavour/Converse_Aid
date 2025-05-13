@@ -44,6 +44,13 @@ export default function InitialMessage() {
     },
   });
 
+  // Update editor editable state when isLoadingMessage changes
+  useEffect(() => {
+    if (editor) {
+      editor.setEditable(!isLoadingMessage);
+    }
+  }, [isLoadingMessage, editor]);
+
   // Load jobs on mount
   useEffect(() => {
     loadJobs();
@@ -219,8 +226,8 @@ export default function InitialMessage() {
           id="subject"
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-          placeholder="Enter email subject"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm disabled:bg-gray-50 disabled:cursor-not-allowed"
+          placeholder={isLoadingMessage ? "Loading subject..." : "Enter email subject"}
           disabled={!selectedJob || isLoading || isLoadingMessage}
         />
       </div>
@@ -236,7 +243,7 @@ export default function InitialMessage() {
           </span>
         </div>
         <div className="border rounded-lg">
-          <EditorContent editor={editor} />
+          <EditorContent editor={editor} className={isLoadingMessage ? "opacity-50" : ""} />
         </div>
       </div>
     </div>
