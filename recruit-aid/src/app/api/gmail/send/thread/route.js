@@ -4,14 +4,14 @@ import { NextResponse } from 'next/server';
 export async function POST(request) {
   try {
     const { from, to, content, access_token } = await request.json();
-    
+    console.log("inside the gmail send route")
     const result = await sendThreadReply({
       from,
       to,
       content,
       access_token
     });
-
+    console.log("result from the gmail send route", result)
     if (!result.success) {
       return NextResponse.json(
         { error: result.error },

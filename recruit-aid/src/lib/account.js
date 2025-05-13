@@ -1,9 +1,9 @@
 // Account management functions
 
-import { deletePineconeNamespace } from '@/lib/pinecone-callRoute';
+import { deletePineconeNamespaceDirect } from '@/lib/pinecone-ops';
 import { stripe } from '@/lib/stripe';
-import { createClient } from '@/lib/supabase';
-import { createServerClient } from '@supabase/ssr';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { fetchWithCSRF } from './fetchWithCSRF';
 
 /**
  * Changes the email address for the authenticated user
@@ -12,30 +12,22 @@ import { createServerClient } from '@supabase/ssr';
  */
 export async function changeEmail(newEmail) {
   try {
-    const response = await fetch('/api/account/change-email', {
-      method: 'POST',
+    const response = await fetchWithCSRF('/api/account/change-email', {
+      method: 'PUT',
       headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ newEmail })
+      body: JSON.stringify({ email: newEmail })
     });
 
-    const data = await response.json();
-
     if (!response.ok) {
-      throw new Error(data.error || 'Failed to change email');
+      throw new Error('Failed to change email');
     }
 
-    return {
-      success: true,
-      message: data.message
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error.message
-    };
+    return await response.json();
+  } catch (err) {
+    console.error('Error changing email:', err);
+    throw err;
   }
 }
 
@@ -46,7 +38,7 @@ export async function changeEmail(newEmail) {
  */
 export async function deleteAccount(userId) {
   try {
-    const supabase = createClient();
+    const supabase = await createSupabaseServerClient();
     const requestId = Date.now(); // For logging purposes
 
     // Get subscription details
@@ -100,7 +92,7 @@ export async function deleteAccount(userId) {
       }
 
       // Delete Pinecone data for all jobs
-      await Promise.all(jobIds.map(jobId => deletePineconeNamespace(jobId)));
+      await Promise.all(jobIds.map(jobId => deletePineconeNamespaceDirect(jobId)));
     }
 
     // Delete remaining user data in specific order
@@ -131,7 +123,7 @@ export async function deleteAccount(userId) {
     }
 
     // Delete the user account using admin client
-    const supabaseAdmin = createServerClient(
+    const supabaseAdmin = await createSupabaseServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.SUPABASE_SERVICE_KEY
     );
@@ -155,7 +147,7 @@ export async function deleteAccount(userId) {
  */
 export async function getSenderCredentials(email) {
   try {
-    const supabase = createClient();
+    const supabase = await createSupabaseServerClient();
     
     // Get the profile with sender info
     const { data: profile, error: profileError } = await supabase
@@ -182,4 +174,28 @@ export async function getSenderCredentials(email) {
       error: error.message
     };
   }
-} 
+}
+
+export async function changePassword(currentPassword, newPassword) {
+  try {
+    const response = await fetchWithCSRF('/api/account/change-password', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        currentPassword,
+        newPassword
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to change password');
+    }
+
+    return await response.json();
+  } catch (err) {
+    console.error('Error changing password:', err);
+    throw err;
+  }
+}

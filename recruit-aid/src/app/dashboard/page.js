@@ -1,6 +1,6 @@
 'use client';
 
-import { getJobs, getProfile, getUser, initializeUserProfile } from '@/lib/supabase';
+import { fetchWithCSRF } from '@/lib/fetchWithCSRF';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -13,148 +13,178 @@ export default function Dashboard() {
     totalJobs: 0,
     recentActivity: []
   });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Load user data and stats
   useEffect(() => {
     async function loadData() {
-      // Get user data from Supabase
-      const { user: userData, error } = await getUser();
-      if (userData) {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Get user data
+        const userResponse = await fetchWithCSRF('/api/auth/user');
+        if (!userResponse.ok) {
+          throw new Error('Failed to fetch user data');
+        }
+        const userData = await userResponse.json();
         setUser(userData);
         
         // Get profile data
-        const { profile: profileData } = await getProfile();
+        const profileResponse = await fetchWithCSRF('/api/profile');
+        if (!profileResponse.ok) {
+          throw new Error('Failed to fetch profile data');
+        }
+        const profileData = await profileResponse.json();
         setProfile(profileData);
         
-        // Initialize user profile if it doesn't exist
-        await initializeUserProfile();
-      }
-      
-      // Fetch job data from Supabase
-      const { jobs, error: jobsError } = await getJobs();
-      
-      if (jobs) {
-        const currentDate = new Date();
+        // Get jobs data
+        const jobsResponse = await fetchWithCSRF('/api/jobs');
+        if (!jobsResponse.ok) {
+          throw new Error('Failed to fetch jobs');
+        }
+        const { jobs } = await jobsResponse.json();
         
-        // Calculate job counts based on end date only
-        const activeJobsCount = jobs.filter(job => {
-          const endDate = new Date(job.job_end_date);
-          return currentDate <= endDate;
-        }).length;
+        // Calculate stats
+        const activeJobs = jobs.filter(job => job.status === 'active').length;
+        const closedJobs = jobs.filter(job => job.status === 'closed').length;
         
-        const closedJobsCount = jobs.filter(job => {
-          const endDate = new Date(job.job_end_date);
-          return currentDate > endDate;
-        }).length;
-        
-        // Set the stats with actual data
         setStats({
-          activeJobs: activeJobsCount,
-          closedJobs: closedJobsCount,
+          activeJobs,
+          closedJobs,
           totalJobs: jobs.length,
-          recentActivity: [
-            { id: 1, type: 'application', job: 'Frontend Developer', candidate: 'John Doe', date: '2 hours ago' },
-            { id: 2, type: 'interview', job: 'UX Designer', candidate: 'Jane Smith', date: '1 day ago' },
-            { id: 3, type: 'job_created', job: 'Product Manager', date: '2 days ago' }
-          ]
+          recentActivity: jobs.slice(0, 5) // Get 5 most recent jobs
         });
-      } else if (jobsError) {
-        console.error('Error fetching jobs:', jobsError);
-        // Set default values in case of error
-        setStats({
-          activeJobs: 0,
-          closedJobs: 0,
-          totalJobs: 0,
-          recentActivity: []
-        });
+      } catch (err) {
+        console.error('Error loading data:', err);
+        setError(err.message || 'Failed to load data');
+      } finally {
+        setLoading(false);
       }
     }
     
     loadData();
   }, []);
 
-  // Get user's name from profile first, then metadata, then email
-  const userName = profile?.name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'there';
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="rounded-md bg-red-50 p-4">
+          <div className="flex">
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">{error}</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Greeting Section */}
-      <div>
-        <h2 className="text-xl font-medium text-gray-700">
-          Hi {userName},
-        </h2>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-gray-900">Welcome back, {profile?.name || user.email}</h1>
+        <p className="mt-1 text-sm text-gray-500">Here's what's happening with your jobs</p>
       </div>
 
-      {/* Job Stats Section - 30% of screen height */}
-      <div className="h-[30vh] grid grid-cols-3 gap-4">
-        {/* View Jobs Box */}
-        <Link 
-          href="/dashboard/view-jobs" 
-          className="bg-white rounded-lg shadow-custom flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors group"
-          title="View Jobs"
-        >
-          <div className="w-12 h-12 rounded-full bg-primary-light flex items-center justify-center mb-3">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-          </div>
-          <span className="text-gray-600 group-hover:text-primary transition-colors">View Jobs</span>
-        </Link>
-
-        {/* Active Jobs Box */}
-        <div className="bg-white rounded-lg shadow-custom p-6 flex flex-col items-center justify-center">
-          <h3 className="text-gray-500 text-sm font-medium mb-3">Active Jobs</h3>
-          <div className="text-3xl font-bold text-gray-900">{stats.activeJobs}</div>
-        </div>
-
-        {/* Total Jobs Box */}
-        <div className="bg-white rounded-lg shadow-custom p-6 flex flex-col items-center justify-center">
-          <h3 className="text-gray-500 text-sm font-medium mb-3">Total Jobs</h3>
-          <div className="text-3xl font-bold text-gray-900">{stats.totalJobs}</div>
-        </div>
-      </div>
-
-      {/* Divider Line */}
-      <div className="border-t border-gray-200 my-6"></div>
-
-      {/* Recent Activity */}
-      <div className="bg-white rounded-lg shadow-custom p-6">
-        <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
-        <div className="space-y-4">
-          {stats.recentActivity.map((activity) => (
-            <div key={activity.id} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-              <div className="flex items-start">
-                <div className="w-10 h-10 rounded-full bg-primary-light flex items-center justify-center mr-3">
-                  {activity.type === 'application' && (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  )}
-                  {activity.type === 'interview' && (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  )}
-                  {activity.type === 'job_created' && (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  )}
-                </div>
-                <div>
-                  <p className="text-gray-800 font-medium">
-                    {activity.type === 'application' && `New application for ${activity.job}`}
-                    {activity.type === 'interview' && `Interview scheduled for ${activity.job}`}
-                    {activity.type === 'job_created' && `New job created: ${activity.job}`}
-                  </p>
-                  {activity.candidate && (
-                    <p className="text-gray-600 text-sm">Candidate: {activity.candidate}</p>
-                  )}
-                  <p className="text-gray-400 text-xs mt-1">{activity.date}</p>
-                </div>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 mb-8">
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="p-5">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Active Jobs</dt>
+                  <dd className="text-lg font-medium text-gray-900">{stats.activeJobs}</dd>
+                </dl>
               </div>
             </div>
-          ))}
+          </div>
+        </div>
+
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="p-5">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Closed Jobs</dt>
+                  <dd className="text-lg font-medium text-gray-900">{stats.closedJobs}</dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="p-5">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Total Jobs</dt>
+                  <dd className="text-lg font-medium text-gray-900">{stats.totalJobs}</dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Activity */}
+      <div className="bg-white shadow rounded-lg">
+        <div className="px-4 py-5 sm:px-6">
+          <h3 className="text-lg leading-6 font-medium text-gray-900">Recent Activity</h3>
+        </div>
+        <div className="border-t border-gray-200">
+          <ul className="divide-y divide-gray-200">
+            {stats.recentActivity.map((job) => (
+              <li key={job.id} className="px-4 py-4 sm:px-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <p className="text-sm font-medium text-blue-600 truncate">{job.title}</p>
+                    <p className="ml-2 flex-shrink-0 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                      {job.status}
+                    </p>
+                  </div>
+                  <div className="ml-2 flex-shrink-0 flex">
+                    <Link href={`/dashboard/view-jobs/${job.id}`} className="font-medium text-blue-600 hover:text-blue-500">
+                      View
+                    </Link>
+                  </div>
+                </div>
+                <div className="mt-2 sm:flex sm:justify-between">
+                  <div className="sm:flex">
+                    <p className="flex items-center text-sm text-gray-500">
+                      Created {new Date(job.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </div>

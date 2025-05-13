@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { google } from 'googleapis';
 
 // Create an OAuth2 client
@@ -25,7 +25,7 @@ export async function refreshAccessToken(email, refresh_token) {
     const { access_token, expiry_date } = credentials;
 
     // Update the token in the database
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createSupabaseServerClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError) throw new Error('Failed to get authenticated user');
 
@@ -174,6 +174,7 @@ export async function sendThreadReply({ from, to, content, access_token }) {
     const failedRecipients = [];
 
     for (const recipient of to) {
+      console.log("viewing each recipient", recipient)
       try {
         if (!recipient.overall_message_id) {
           throw new Error('Missing thread information');
@@ -218,6 +219,7 @@ export async function sendThreadReply({ from, to, content, access_token }) {
           gmailId: response.data.id
         });
       } catch (error) {
+        console.log("error in the send thread reply", error.message)
         failedRecipients.push({
           email: recipient.email,
           name: recipient.name,
@@ -291,7 +293,7 @@ export async function getMessageHeaders(gmailId, access_token) {
 export async function startGmailAuth(email) {
   try {
     const oauth2Client = createOAuth2Client();
-    const SCOPES = ['https://www.googleapis.com/auth/gmail.modify'];
+    const SCOPES = [process.env.GOOGLE_GMAIL_SCOPES];
 
     const state = Buffer.from(JSON.stringify({ 
       email, 
@@ -346,7 +348,7 @@ export async function handleGmailAuthCallback(code, state) {
     }
 
     // Save the credentials to the user's profile
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createSupabaseServerClient();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError) throw new Error('User not authenticated');
 
@@ -382,12 +384,26 @@ export async function handleGmailAuthCallback(code, state) {
 
     if (updateError) throw new Error('Failed to update profile');
 
+    // Fetch the updated profile
+    const { data: updatedProfile, error: fetchError } = await supabase
+      .from('profiles')
+      .select('sender')
+      .eq('id', user.id)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching updated profile:', fetchError);
+      // Don't throw here, just return what we have
+    }
+
     return {
       success: true,
       email,
-      message: 'Email successfully connected'
+      message: 'Email successfully connected',
+      profile: updatedProfile
     };
   } catch (error) {
+    console.error('Error in handleGmailAuthCallback:', error);
     return {
       success: false,
       error: error.message

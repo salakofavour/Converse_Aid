@@ -1,4 +1,4 @@
-import { deletePineconeNamespaceDirect } from '@/lib/pinecone-deleteFunction';
+import { deletePineconeNamespaceDirect } from '@/lib/pinecone-ops';
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {

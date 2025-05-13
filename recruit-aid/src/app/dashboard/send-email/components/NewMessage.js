@@ -1,11 +1,14 @@
 'use client';
 
-import { getJobs, getMembers } from '@/lib/supabase';
+import { fetchWithCSRF } from '@/lib/fetchWithCSRF';
 import { Listbox } from '@headlessui/react';
 import { ChevronUpDownIcon } from '@heroicons/react/24/outline';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useEffect, useState } from 'react';
+import { toast } from 'react-hot-toast';
+
+const WORD_LIMIT = 350;
 
 export default function NewMessage() {
   const [selectedJob, setSelectedJob] = useState(null);
@@ -18,6 +21,8 @@ export default function NewMessage() {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
+  const [wordCount, setWordCount] = useState(0);
+  const [isLoadingMessage, setIsLoadingMessage] = useState(false);
 
   // Initialize TipTap editor
   const editor = useEditor({
@@ -29,8 +34,18 @@ export default function NewMessage() {
     },
     content: '',
     editable: true,
+    immediatelyRender: false,
     onUpdate: ({ editor }) => {
-      console.log(editor.getHTML());
+      const text = editor.getText();
+      const words = text.trim().split(/\s+/).filter(word => word.length > 0);
+      setWordCount(words.length);
+      
+      // If word limit exceeded, prevent further typing
+      if (words.length > WORD_LIMIT) {
+        const truncatedText = words.slice(0, WORD_LIMIT).join(' ');
+        editor.commands.setContent(truncatedText);
+        toast.error(`Word limit of ${WORD_LIMIT} words reached`);
+      }
     },
   });
 
@@ -43,25 +58,25 @@ export default function NewMessage() {
 
   // Load jobs on mount
   useEffect(() => {
-    async function loadJobs() {
-      try {
-        setIsLoadingJobs(true);
-        setError(null);
-        const { jobs: jobsData, error: jobsError } = await getJobs();
-        
-        if (jobsError) throw new Error(jobsError.message);
-        
-        setJobs(jobsData || []);
-      } catch (err) {
-        console.error('Error loading jobs:', err);
-        setError('Failed to load jobs. Please try again.');
-      } finally {
-        setIsLoadingJobs(false);
-      }
-    }
-    
     loadJobs();
   }, []);
+
+  const loadJobs = async () => {
+    try {
+      setIsLoadingJobs(true);
+      const response = await fetchWithCSRF('/api/jobs');
+      if (!response.ok) {
+        throw new Error('Failed to fetch jobs');
+      }
+      const { jobs: jobsData } = await response.json();
+      setJobs(jobsData || []);
+    } catch (err) {
+      console.error('Error loading jobs:', err);
+      toast.error('Failed to load jobs');
+    } finally {
+      setIsLoadingJobs(false);
+    }
+  };
 
   // Load members when job is selected
   useEffect(() => {
@@ -75,17 +90,12 @@ export default function NewMessage() {
       try {
         setIsLoadingMembers(true);
         setError(null);
-        const { members: membersData, error: membersError } = await getMembers(selectedJob.id);
-        
-        if (membersError) throw new Error(membersError.message);
-        
-        const formattedMembers = membersData?.map(member => ({
-          id: member.id,
-          name: member.name_email.name,
-          email: member.name_email.email
-        })) || [];
-        
-        setMembers(formattedMembers);
+        const response = await fetchWithCSRF(`/api/members?jobId=${selectedJob.id}`);
+        if (!response.ok) {
+          throw new Error('Failed to load members');
+        }
+        const { members: membersData } = await response.json();
+        setMembers(membersData || []);
         setSelectedMembers([]);
       } catch (err) {
         console.error('Error loading members:', err);
@@ -110,7 +120,7 @@ export default function NewMessage() {
   // Check if access token needs refresh
   const checkAndRefreshToken = async (email, refresh_token) => {
     try {
-      const response = await fetch('/api/gmail/refresh-token', {
+      const response = await fetchWithCSRF('/api/gmail/refresh-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, refresh_token })
@@ -144,7 +154,7 @@ export default function NewMessage() {
       setSuccessMessage('');
 
       // Get sender credentials from profiles
-      const response = await fetch('/api/supabase/get-sender-creds', {
+      const response = await fetchWithCSRF('/api/supabase/get-sender-creds', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: selectedJob.Job_email })
@@ -160,15 +170,15 @@ export default function NewMessage() {
       );
 
       // Send email with custom subject
-      const sendResponse = await fetch('/api/gmail/send/new', {
+      const sendResponse = await fetchWithCSRF('/api/gmail/send/new', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           from: selectedJob.Job_email,
           to: selectedMembers.map(member => ({
             id: member.id,
-            name: member.name,
-            email: member.email
+            name: member.name_email.name,
+            email: member.name_email.email
           })),
           content: editor.getHTML(),
           subject: trimmedSubject,
@@ -185,7 +195,7 @@ export default function NewMessage() {
         const headerPromises = sendResult.successfulRecipients.map(async (recipient) => {
           try {
             console.log("Fetching headers for recipient:", recipient.email);
-            const headerResponse = await fetch(`/api/gmail/headers?gmailId=${recipient.gmailId}`);
+            const headerResponse = await fetchWithCSRF(`/api/gmail/headers?gmailId=${recipient.gmailId}`);
             const headerData = await headerResponse.json();
             console.log("Raw headerData received:", headerData);
             return {
@@ -197,48 +207,37 @@ export default function NewMessage() {
               subject: headerData.subject
             };
           } catch (error) {
-            console.error(`Failed to fetch headers for recipient ${recipient.email}:`, error);
-            // If headers fetch fails, still update with the gmailId we got from send
-            return {
-              id: recipient.id,
-              gmailId: recipient.gmailId,
-              messageId: null,
-              threadId: null,
-              references: null
-            };
+            console.error("Error fetching headers for recipient:", recipient.email, error);
+            return null;
           }
         });
 
-        console.log("About to await Promise.all for headers");
-        const headersResults = await Promise.all(headerPromises);
-        console.log("Headers results received:", headersResults);
+        const headerResults = await Promise.all(headerPromises);
+        const validHeaderResults = headerResults.filter(result => result !== null);
 
-        // Single update with all information
-        console.log("Sending update to database with:", headersResults);
-        await fetch('/api/supabase/update-message-id', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            members: headersResults
-          })
-        });
-        console.log("Database update complete");
-      }
-      //the console statements in the heeader call above are not displaying, but it actually runs. 
-      //used a suggestion from cursor to display it in developer tools of browser, but i dont really need it, so i reverted it.
+        if (validHeaderResults.length > 0) {
+          // Update message IDs for each member in the database
+          const updateResponse = await fetchWithCSRF('/api/members/message-ids', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              updates: validHeaderResults
+            })
+          });
 
-      if (sendResult.failedRecipients?.length) {
-        setSuccessMessage(`Email sent successfully but failed for: ${sendResult.failedRecipients.map(r => r.email).join(', ')}`);
-      } else {
-        setSuccessMessage('Email sent successfully!');
+            //always console the response just for debugging for now, it contains the success & failures
+            console.log("Result from update message IDs", updateResponse);
+        }
       }
 
-      // Reset form
-      setSelectedJob(null);
-      setSelectedMembers([]);
+      if (sendResult.error) {
+        throw new Error(sendResult.error);
+      }
+
+      setSuccessMessage('Email sent successfully!');
       setSubject('');
       editor.commands.setContent('');
-
+      setSelectedMembers([]);
     } catch (err) {
       console.error('Error sending email:', err);
       setError(err.message || 'Failed to send email. Please try again.');
@@ -247,204 +246,219 @@ export default function NewMessage() {
     }
   };
 
-  const isFormValid = selectedJob && selectedMembers.length > 0 && subject.trim() && editor?.getHTML();
-
   return (
     <div className="space-y-6">
-      {/* Messages */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
-          <span className="block sm:inline">{error}</span>
-        </div>
-      )}
-
-      {successMessage && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded relative" role="alert">
-          <span className="block sm:inline">{successMessage}</span>
-        </div>
-      )}
-
-      <div className="space-y-6">
-        {/* Job Selection */}
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">Jobs</label>
-          <Listbox value={selectedJob} onChange={setSelectedJob} disabled={isLoadingJobs || isSending}>
-            <div className="relative mt-1">
-              <Listbox.Button className={`relative w-full cursor-default rounded-lg bg-white py-2 pl-3 pr-10 text-left border ${
-                isLoadingJobs || isSending ? 'bg-gray-50 cursor-not-allowed' : 'border-gray-300 hover:border-gray-400'
-              } focus:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-opacity-50`}>
-                <span className={`block truncate ${selectedJob ? 'text-black' : 'text-[#1a1a1a]'}`}>
-                  {isLoadingJobs ? 'Loading jobs...' : (selectedJob?.title || 'Select a job')}
-                </span>
-                <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                  <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                </span>
-              </Listbox.Button>
-              <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-                {jobs.map((job) => (
+      {/* Job Selection */}
+      <div>
+        <label htmlFor="job" className="block text-sm font-medium text-gray-700">
+          Select Job
+        </label>
+        <Listbox value={selectedJob} onChange={setSelectedJob}>
+          <div className="relative mt-1">
+            <Listbox.Button className="relative w-full cursor-default rounded-lg bg-white py-2 pl-3 pr-10 text-left border focus:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-primary sm:text-sm">
+              <span className="block truncate">
+                {selectedJob ? selectedJob.title : 'Select a job'}
+              </span>
+              <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                <ChevronUpDownIcon
+                  className="h-5 w-5 text-gray-400"
+                  aria-hidden="true"
+                />
+              </span>
+            </Listbox.Button>
+            <Listbox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+              {isLoadingJobs ? (
+                <div className="relative cursor-default select-none py-2 pl-10 pr-4 text-gray-900">
+                  Loading jobs...
+                </div>
+              ) : jobs.length === 0 ? (
+                <div className="relative cursor-default select-none py-2 pl-10 pr-4 text-gray-900">
+                  No jobs found
+                </div>
+              ) : (
+                jobs.map((job) => (
                   <Listbox.Option
                     key={job.id}
+                    className={({ active }) =>
+                      `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                        active ? 'bg-primary text-white' : 'text-gray-900'
+                      }`
+                    }
                     value={job}
-                    className={({ active }) => `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                      active ? 'bg-primary-50 text-primary-900' : 'text-gray-900'
-                    }`}
                   >
-                    {({ selected }) => (
+                    {({ selected, active }) => (
                       <>
-                        <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
+                        <span
+                          className={`block truncate ${
+                            selected ? 'font-medium' : 'font-normal'
+                          }`}
+                        >
                           {job.title}
                         </span>
+                        {selected ? (
+                          <span
+                            className={`absolute inset-y-0 left-0 flex items-center pl-3 ${
+                              active ? 'text-white' : 'text-primary'
+                            }`}
+                          >
+                            ✓
+                          </span>
+                        ) : null}
                       </>
                     )}
                   </Listbox.Option>
-                ))}
+                ))
+              )}
+            </Listbox.Options>
+          </div>
+        </Listbox>
+      </div>
+
+      {/* Member Selection */}
+      {selectedJob && (
+        <div>
+          <div className="flex justify-between items-center mb-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Select Recipients
+            </label>
+            <button
+              type="button"
+              onClick={handleSelectAllMembers}
+              className="text-sm text-primary hover:text-primary-dark"
+            >
+              {selectedMembers.length === members.length
+                ? 'Deselect All'
+                : 'Select All'}
+            </button>
+          </div>
+          <Listbox value={selectedMembers} onChange={setSelectedMembers} multiple>
+            <div className="relative mt-1">
+              <Listbox.Button className="relative w-full cursor-default rounded-lg bg-white py-2 pl-3 pr-10 text-left border focus:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-primary sm:text-sm">
+                <span className="block truncate">
+                  {selectedMembers.length === 0
+                    ? 'Select recipients'
+                    : `${selectedMembers.length} selected`}
+                </span>
+                <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                  <ChevronUpDownIcon
+                    className="h-5 w-5 text-gray-400"
+                    aria-hidden="true"
+                  />
+                </span>
+              </Listbox.Button>
+              <Listbox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                {isLoadingMembers ? (
+                  <div className="relative cursor-default select-none py-2 pl-10 pr-4 text-gray-900">
+                    Loading members...
+                  </div>
+                ) : members.length === 0 ? (
+                  <div className="relative cursor-default select-none py-2 pl-10 pr-4 text-gray-900">
+                    No members found
+                  </div>
+                ) : (
+                  members.map((member) => (
+                    <Listbox.Option
+                      key={member.id}
+                      className={({ active }) =>
+                        `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                          active ? 'bg-primary text-white' : 'text-gray-900'
+                        }`
+                      }
+                      value={member}
+                    >
+                      {({ selected, active }) => (
+                        <>
+                          <span
+                            className={`block truncate ${
+                              selected ? 'font-medium' : 'font-normal'
+                            }`}
+                          >
+                            {member.name_email.name} ({member.name_email.email})
+                          </span>
+                          {selected ? (
+                            <span
+                              className={`absolute inset-y-0 left-0 flex items-center pl-3 ${
+                                active ? 'text-white' : 'text-primary'
+                              }`}
+                            >
+                              ✓
+                            </span>
+                          ) : null}
+                        </>
+                      )}
+                    </Listbox.Option>
+                  ))
+                )}
               </Listbox.Options>
             </div>
           </Listbox>
         </div>
+      )}
 
-        {/* Member Selection */}
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">To:</label>
-          <div className={`relative ${!selectedJob || isSending ? 'opacity-60' : ''}`}>
-            <Listbox
-              value={selectedMembers}
-              onChange={setSelectedMembers}
-              multiple
-              disabled={!selectedJob || isLoadingMembers || isSending}
-            >
-              <div className="relative mt-1">
-                <Listbox.Button className={`relative w-full cursor-default rounded-lg bg-white py-2 pl-3 pr-10 text-left border ${
-                  !selectedJob || isLoadingMembers || isSending ? 'bg-gray-50 cursor-not-allowed' : 'border-gray-300 hover:border-gray-400'
-                } focus:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-opacity-50`}>
-                  <span className={`block truncate ${selectedMembers.length > 0 ? 'text-black' : 'text-[#1a1a1a]'}`}>
-                    {isLoadingMembers ? 'Loading members...' : 
-                      selectedMembers.length === 0 ? 'Select members' :
-                      `${selectedMembers.length} member(s) selected`}
-                  </span>
-                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                    <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                  </span>
-                </Listbox.Button>
+      {/* Subject */}
+      <div>
+        <label htmlFor="subject" className="block text-sm font-medium text-gray-700">
+          Subject
+        </label>
+        <input
+          type="text"
+          id="subject"
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+          placeholder="Enter email subject"
+        />
+      </div>
 
-                <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-                  {/* Select All Option */}
-                  <div
-                    className="relative cursor-pointer select-none py-2 pl-10 pr-4 hover:bg-primary-50 text-gray-900 border-b border-gray-100"
-                    onClick={handleSelectAllMembers}
-                  >
-                    <span className="block truncate font-medium">
-                      {selectedMembers.length === members.length ? 'Deselect All' : 'Select All Members'}
-                    </span>
-                  </div>
-
-                  {members.map((member) => (
-                    <Listbox.Option
-                      key={member.id}
-                      value={member}
-                      className={({ active }) => `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                        active ? 'bg-primary-50 text-primary-900' : 'text-gray-900'
-                      }`}
-                    >
-                      {({ selected }) => (
-                        <>
-                          <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
-                            {member.name}
-                          </span>
-                        </>
-                      )}
-                    </Listbox.Option>
-                  ))}
-                </Listbox.Options>
-              </div>
-            </Listbox>
-
-            {/* Selected Members Tags */}
-            {selectedMembers.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {selectedMembers.map((member) => (
-                  <span
-                    key={member.id}
-                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-primary-100 text-primary-800"
-                  >
-                    {member.name}
-                    <button
-                      type="button"
-                      onClick={() => setSelectedMembers(selectedMembers.filter(m => m.id !== member.id))}
-                      className="ml-1 inline-flex items-center p-0.5 rounded-full text-primary-400 hover:bg-primary-200 hover:text-primary-500 focus:outline-none"
-                      disabled={isSending}
-                    >
-                      <span className="sr-only">Remove</span>
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+      {/* Message Editor */}
+      <div>
+        <div className="flex justify-between items-center mb-1">
+          <label className="block text-sm font-medium text-gray-700">
+            Message
+          </label>
+          <span className={`text-sm ${wordCount > WORD_LIMIT ? 'text-red-500' : 'text-gray-500'}`}>
+            {wordCount}/{WORD_LIMIT} words
+          </span>
         </div>
-
-        {/* Subject Field */}
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">Subject:</label>
-          <div className={`relative ${!selectedMembers.length || isSending ? 'opacity-60' : ''}`}>
-            <input
-              type="text"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              disabled={!selectedMembers.length || isSending}
-              placeholder="Enter email subject"
-              className={`mt-1 block w-full rounded-md ${
-                !selectedMembers.length || isSending
-                  ? 'bg-gray-50 cursor-not-allowed border-gray-200'
-                  : 'bg-white border-gray-300 hover:border-gray-400'
-              } px-3 py-2 border shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary text-black placeholder-[#1a1a1a]`}
-            />
-          </div>
-        </div>
-
-        {/* Message Editor */}
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">Message</label>
-          <div className={`relative ${!selectedJob || isSending ? 'opacity-60' : ''}`}>
-            <div className={`mt-1 block w-full rounded-md border ${
-              !selectedJob || isSending 
-                ? 'bg-gray-50 cursor-not-allowed border-gray-200 border-dashed' 
-                : 'bg-white border-gray-300 hover:border-gray-400'
-            } shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary`}>
-              <EditorContent 
-                editor={editor} 
-                className="prose prose-sm sm:prose lg:prose-lg xl:prose-2xl focus:outline-none min-h-[200px] p-4 text-black [&_p.is-editor-empty:first-child::before]:text-[#1a1a1a]"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Send Button */}
-        <div className="flex justify-end">
-          <button
-            onClick={handleSend}
-            disabled={!isFormValid || isLoadingMembers || isSending}
-            className={`px-4 py-2 rounded-md ${
-              isFormValid && !isLoadingMembers && !isSending
-                ? 'bg-primary text-white hover:bg-primary-600 hover:scale-105 transform transition-all'
-                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            {isSending ? 'Sending...' : 'Send'}
-          </button>
+        <div className="border rounded-lg">
+          <EditorContent editor={editor} />
         </div>
       </div>
 
-      {/* Loading Overlay */}
-      {(isLoadingMembers || isSending) && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white p-4 rounded-lg shadow-lg flex items-center space-x-3">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-            <span>{isLoadingMembers ? 'Loading members...' : 'Sending email...'}</span>
+      {/* Error and Success Messages */}
+      {error && (
+        <div className="rounded-md bg-red-50 p-4">
+          <div className="flex">
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">{error}</h3>
+            </div>
           </div>
         </div>
       )}
+
+      {successMessage && (
+        <div className="rounded-md bg-green-50 p-4">
+          <div className="flex">
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-green-800">
+                {successMessage}
+              </h3>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send Button */}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={handleSend}
+          disabled={isSending || !selectedJob || !selectedMembers.length || !editor?.getHTML() || !subject.trim()}
+          className="inline-flex justify-center rounded-md border border-transparent bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isSending ? 'Sending...' : 'Send Email'}
+        </button>
+      </div>
     </div>
   );
 } 

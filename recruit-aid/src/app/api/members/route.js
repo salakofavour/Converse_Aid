@@ -1,19 +1,9 @@
-import { createMember, deleteMember, getMembers, updateMember } from '@/lib/supabase';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { NextResponse } from 'next/server';
 
-// Get all members for a job
+// GET /api/members
 export async function GET(request) {
   try {
-    // Verify CSRF protection
-    const requestedWith = request.headers.get('x-requested-with');
-    if (!requestedWith || requestedWith !== 'XMLHttpRequest') {
-      return NextResponse.json(
-        { error: 'Invalid request' },
-        { status: 403 }
-      );
-    }
-
-    // Get job ID from query params
     const { searchParams } = new URL(request.url);
     const jobId = searchParams.get('jobId');
 
@@ -24,16 +14,36 @@ export async function GET(request) {
       );
     }
 
-    // Get members
-    const result = await getMembers(jobId);
-    if (result.error) {
+    const supabase = await createSupabaseServerClient();
+
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError) {
+      console.error('Error getting user:', userError);
       return NextResponse.json(
-        { error: result.error },
-        { status: 400 }
+        { error: 'Failed to get user' },
+        { status: 401 }
       );
     }
 
-    return NextResponse.json(result);
+    // Get members for the job
+    const { data: members, error: membersError } = await supabase
+      .from('members')
+      .select(`
+        id,
+        name_email
+      `)
+      .eq('job_id', jobId);
+
+    if (membersError) {
+      console.error('Error fetching members:', membersError);
+      return NextResponse.json(
+        { error: 'Failed to fetch members' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ members });
   } catch (error) {
     console.error('Error in members GET route:', error);
     return NextResponse.json(
@@ -43,37 +53,57 @@ export async function GET(request) {
   }
 }
 
-// Create a new member
+// POST /api/members
 export async function POST(request) {
   try {
-    // Verify CSRF protection
-    const requestedWith = request.headers.get('x-requested-with');
-    if (!requestedWith || requestedWith !== 'XMLHttpRequest') {
-      return NextResponse.json(
-        { error: 'Invalid request' },
-        { status: 403 }
-      );
-    }
+    const { jobId, name, email } = await request.json();
 
-    const { jobId, ...memberData } = await request.json();
-
-    if (!jobId) {
+    if (!jobId || !name || !email) {
       return NextResponse.json(
-        { error: 'Job ID is required' },
+        { error: 'Job ID, name, and email are required' },
         { status: 400 }
       );
     }
 
-    // Create member
-    const result = await createMember(jobId, memberData);
-    if (result.error) {
+    const supabase = await createSupabaseServerClient();
+
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError) {
+      console.error('Error getting user:', userError);
       return NextResponse.json(
-        { error: result.error },
-        { status: 400 }
+        { error: 'Failed to get user' },
+        { status: 401 }
       );
     }
 
-    return NextResponse.json(result);
+    // Then create the member record
+    const { data: member, error: memberError } = await supabase
+      .from('members')
+      .insert([
+        {
+          job_id: jobId,
+          name_email: {
+            name,
+            email
+          }
+        }
+      ])
+      .select(`
+        id,
+        name_email
+      `)
+      .single();
+
+    if (memberError) {
+      console.error('Error creating member:', memberError);
+      return NextResponse.json(
+        { error: 'Failed to create member' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ member });
   } catch (error) {
     console.error('Error in members POST route:', error);
     return NextResponse.json(
@@ -83,40 +113,56 @@ export async function POST(request) {
   }
 }
 
-// Update a member
+//confirm if this is to be id or jobId, also I use delete & insert, there is not really a choice for put/update, but would confirm.
+// PUT /api/members
 export async function PUT(request) {
   try {
-    // Verify CSRF protection
-    const requestedWith = request.headers.get('x-requested-with');
-    if (!requestedWith || requestedWith !== 'XMLHttpRequest') {
-      return NextResponse.json(
-        { error: 'Invalid request' },
-        { status: 403 }
-      );
-    }
+    const { id, name, email } = await request.json();
 
-    const { searchParams } = new URL(request.url);
-    const memberId = searchParams.get('id');
-
-    if (!memberId) {
+    if (!id || !name || !email) {
       return NextResponse.json(
-        { error: 'Member ID is required' },
+        { error: 'Member ID, name, and email are required' },
         { status: 400 }
       );
     }
 
-    const memberData = await request.json();
+    const supabase = await createSupabaseServerClient();
 
-    // Update member
-    const result = await updateMember(memberId, memberData);
-    if (result.error) {
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError) {
+      console.error('Error getting user:', userError);
       return NextResponse.json(
-        { error: result.error },
-        { status: 400 }
+        { error: 'Failed to get user' },
+        { status: 401 }
       );
     }
 
-    return NextResponse.json(result);
+    // Update the member's name_email
+    const { data: member, error: memberError } = await supabase
+      .from('members')
+      .update({
+        name_email: {
+          name,
+          email
+        }
+      })
+      .eq('id', id)
+      .select(`
+        id,
+        name_email
+      `)
+      .single();
+
+    if (memberError) {
+      console.error('Error updating member:', memberError);
+      return NextResponse.json(
+        { error: 'Failed to update member' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ member });
   } catch (error) {
     console.error('Error in members PUT route:', error);
     return NextResponse.json(
@@ -126,38 +172,46 @@ export async function PUT(request) {
   }
 }
 
-// Delete a member
+// DELETE /api/members
 export async function DELETE(request) {
   try {
-    // Verify CSRF protection
-    const requestedWith = request.headers.get('x-requested-with');
-    if (!requestedWith || requestedWith !== 'XMLHttpRequest') {
-      return NextResponse.json(
-        { error: 'Invalid request' },
-        { status: 403 }
-      );
-    }
-
     const { searchParams } = new URL(request.url);
-    const memberId = searchParams.get('id');
+    const id = searchParams.get('id');
 
-    if (!memberId) {
+    if (!id) {
       return NextResponse.json(
         { error: 'Member ID is required' },
         { status: 400 }
       );
     }
 
-    // Delete member
-    const result = await deleteMember(memberId);
-    if (result.error) {
+    const supabase = await createSupabaseServerClient();
+
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError) {
+      console.error('Error getting user:', userError);
       return NextResponse.json(
-        { error: result.error },
-        { status: 400 }
+        { error: 'Failed to get user' },
+        { status: 401 }
       );
     }
 
-    return NextResponse.json(result);
+    // Delete the member
+    const { error: memberError } = await supabase
+      .from('members')
+      .delete()
+      .eq('id', id)
+
+    if (memberError) {
+      console.error('Error deleting member:', memberError);
+      return NextResponse.json(
+        { error: 'Failed to delete member' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in members DELETE route:', error);
     return NextResponse.json(

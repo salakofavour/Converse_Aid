@@ -54,8 +54,9 @@ export async function POST(request) {
         error: 'Job ID and action are required'
       }), { status: 400 });
     }
-
+    console.log("about to call updateAgentState function");
     const result = await updateAgentState(jobId, action);
+    console.log("updateAgentState function completed");
     return new Response(JSON.stringify(result), {
       status: result.success ? 200 : 400
     });

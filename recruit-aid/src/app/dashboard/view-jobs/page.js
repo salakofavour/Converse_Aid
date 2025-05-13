@@ -1,14 +1,13 @@
 'use client';
 
+import { DeleteJobModal } from '@/components/modals/DeleteJobModal';
 import { JobLimitModal } from '@/components/modals/JobLimitModal';
-import { deletePineconeNamespace } from '@/lib/pinecone-callRoute';
-import { createClient, deleteJob, getJobs, getMembers } from '@/lib/supabase';
+import { fetchWithCSRF } from '@/lib/fetchWithCSRF';
 import { TrashIcon } from '@heroicons/react/24/outline';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-
 export default function ViewJobs() {
   const router = useRouter();
   const [jobs, setJobs] = useState([]);
@@ -19,46 +18,79 @@ export default function ViewJobs() {
   const [selectedActions, setSelectedActions] = useState({}); // Track selected action for each job
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [jobToDelete, setJobToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   
-  // Load jobs data from Supabase
-  useEffect(() => {
-    async function loadJobs() {
-      try {
-        setIsLoading(true);
-        const supabase = createClient();
-        const { jobs: jobsData, error: jobsError } = await getJobs();
-        
-        if (jobsError) {
-          throw new Error(jobsError.message);
-        }
-        
-        // Get subscription status
-        const { data: subscription } = await supabase
-          .from('subscriptions')
-          .select('status')
-          .single();
-        
-        setIsSubscribed(subscription?.status === 'active' || subscription?.status === 'trialing');
-        setJobs(jobsData || []);
+  // Load jobs data from API
+  const loadJobs = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
 
-        // Load applicant counts for each job
-        const applicantCounts = {};
-        await Promise.all((jobsData || []).map(async (job) => {
-          const { members } = await getMembers(job.id);
-          applicantCounts[job.id] = members?.length || 0;
-        }));
-        setJobMembers(applicantCounts);
-
-      } catch (err) {
-        console.error('Error loading jobs:', err);
-        setError(err.message || 'Failed to load jobs');
-      } finally {
-        setIsLoading(false);
+      // Fetch jobs
+      const jobsResponse = await fetchWithCSRF('/api/jobs');
+      if (!jobsResponse.ok) {
+        throw new Error('Failed to fetch jobs');
       }
+      const { jobs: jobsData } = await jobsResponse.json();
+      setJobs(jobsData);
+
+      // Fetch members for each job
+      const membersPromises = jobsData.map(job => 
+        fetchWithCSRF(`/api/members?jobId=${job.id}`)
+          .then(res => res.json())
+          .then(data => ({ jobId: job.id, members: data.members || [] }))
+          .catch(() => ({ jobId: job.id, members: [] }))
+      );
+
+      const membersResults = await Promise.all(membersPromises);
+      const membersMap = membersResults.reduce((acc, { jobId, members }) => {
+        acc[jobId] = members.length;
+        return acc;
+      }, {});
+      setJobMembers(membersMap);
+
+    } catch (err) {
+      console.error('Error loading jobs:', err);
+      setError('Failed to load jobs. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-    
+  };
+
+  useEffect(() => {
     loadJobs();
   }, []);
+
+  // Separate useEffect for subscription check
+  useEffect(() => {
+    async function checkSubscription() {
+      try {
+        const subscriptionResponse = await fetchWithCSRF('/api/subscriptions/check-subscription');
+        if (!subscriptionResponse.ok) {
+          console.error('Failed to fetch subscription status');
+          return;
+        }
+
+        const { subscription } = await subscriptionResponse.json();
+        // Check for both active and trialing states
+        const hasActiveSubscription = subscription?.status === 'active' || subscription?.status === 'trialing';
+        setIsSubscribed(hasActiveSubscription);
+      } catch (err) {
+        console.error('Error checking subscription:', err);
+        // Don't set error state here as it's not critical for the main functionality
+      }
+    }
+
+    checkSubscription();
+  }, []);
+
+  // Add a debug log for isSubscribed state changes
+  useEffect(() => {
+    console.log('isSubscribed state updated:', isSubscribed);
+  }, [isSubscribed]);
 
   // Format date for display
   const formatDate = (dateString) => {
@@ -89,90 +121,50 @@ export default function ViewJobs() {
     }));
   };
 
-  // Handle action button click
-  const handleActionClick = async (e, jobId) => {
-    e.stopPropagation(); // Prevent job card click
-    const selectedAction = selectedActions[jobId];
-    
-    if (!selectedAction) return;
-
-    try {
-      const response = await fetch('/api/update-agent-state', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-requested-with': 'XMLHttpRequest'
-        },
-        body: JSON.stringify({
-          jobId,
-          action: selectedAction
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update job state');
-      }
-
-      // Show success toast and refresh jobs
-      toast.success('Job state updated successfully');
-      const { jobs: updatedJobs, error: jobsError } = await getJobs();
-      
-      if (jobsError) {
-        throw new Error(jobsError.message);
-      }
-      
-      setJobs(updatedJobs || []);
-
-    } catch (error) {
-      console.error('Error updating job state:', error);
-      toast.error(error.message || 'Failed to update job state');
-    }
-  };
-
   // Handle job deletion
   const handleDeleteJob = async (e, jobId) => {
     e.stopPropagation(); // Prevent job card click when clicking delete
+    const job = jobs.find(j => j.id === jobId);
+    setJobToDelete({ id: jobId, title: job?.title });
+    setShowDeleteModal(true);
+  };
 
-    // Show confirmation dialog
-    if (!window.confirm('Are you sure you want to delete this job? This action cannot be undone.')) {
-      return;
-    }
+  const handleConfirmDelete = async () => {
+    if (!jobToDelete) return;
 
-    setDeletingJobs(prev => new Set([...prev, jobId]));
+    setDeletingJobs(prev => new Set([...prev, jobToDelete.id]));
     setError(null);
 
     try {
-      // Delete from Supabase
-      const { error: supabaseError } = await deleteJob(jobId);
-      if (supabaseError) throw new Error('Failed to delete job from database');
+      setIsDeleting(true);
+      const response = await fetchWithCSRF(`/api/jobs/${jobToDelete.id}`, {
+        method: 'DELETE'
+      });
 
-      // Delete from Pinecone
-      try {
-        await deletePineconeNamespace(jobId.toString());
-      } catch (pineconeError) {
-        console.error('Error deleting Pinecone namespace:', pineconeError);
-        // Don't throw here as the job is already deleted from Supabase
+      if (!response.ok) {
+        throw new Error('Failed to delete job');
       }
 
-      // Update local state
-      setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
+      setJobs(jobs.filter(job => job.id !== jobToDelete.id));
       setJobMembers(prev => {
         const updated = { ...prev };
-        delete updated[jobId];
+        delete updated[jobToDelete.id];
         return updated;
       });
 
+      toast.success('Job deleted successfully');
     } catch (err) {
       console.error('Error deleting job:', err);
       setError('Failed to delete job. Please try again.');
     } finally {
       setDeletingJobs(prev => {
         const updated = new Set(prev);
-        updated.delete(jobId);
+        updated.delete(jobToDelete.id);
         return updated;
       });
+      setShowDeleteModal(false);
+      setJobToDelete(null);
+      setIsDeleting(false);
     }
   };
 
@@ -181,6 +173,94 @@ export default function ViewJobs() {
     if (!text) return '';
     const words = text.split(' ');
     return words.length > 10 ? words.slice(0, 10).join(' ') + '...' : text;
+  }
+
+  // Add function to get valid actions based on current state
+  function getValidActions(job) {
+    // If job is closed, no actions are allowed
+    if (job.status === 'closed') {
+      return [];
+    }
+
+    // Get valid transitions based on current agent state
+    const stateTransitions = {
+      'running': ['Stop', 'Pause'],
+      'stopped': ['Start'],
+      'paused': ['Resume', 'Stop']
+    };
+
+    const currentState = job.agent_state || 'stopped';
+    return stateTransitions[currentState] || [];
+  }
+
+  // Update handleActionClick to handle invalid transitions
+  const handleActionClick = async (e, jobId) => {
+    e.stopPropagation(); // Prevent job card click
+    const selectedAction = selectedActions[jobId];
+    const job = jobs.find(j => j.id === jobId);
+    
+    if (!selectedAction) return;
+
+    // Validate transition before making the API call
+    const validActions = getValidActions(job);
+    if (!validActions.includes(selectedAction)) {
+      toast.error(`Cannot ${selectedAction.toLowerCase()} from ${job.agent_state || 'current'} state`);
+      return;
+    }
+
+    try {
+      setIsUpdating(true);
+      const response = await fetchWithCSRF('/api/jobs/update-agent-state', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          jobId,
+          state: selectedAction
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update job state');
+      }
+
+      setJobs(jobs.map(j => 
+        j.id === jobId ? { ...j, agent_state: selectedAction } : j
+      ));
+      toast.success('Job state updated successfully');
+    } catch (error) {
+      console.error('Error updating job state:', error);
+      toast.error(error.message || 'Failed to update job state');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    try {
+      setIsLoading(true);
+      const jobsResponse = await fetchWithCSRF('/api/jobs');
+      if (!jobsResponse.ok) {
+        throw new Error('Failed to fetch jobs');
+      }
+      const { jobs: jobsData } = await jobsResponse.json();
+      setJobs(jobsData);
+      toast.success('Jobs refreshed successfully');
+    } catch (err) {
+      console.error('Error refreshing jobs:', err);
+      toast.error('Failed to refresh jobs');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (error) {
+    return <div>Error: {error}</div>;
   }
 
   return (
@@ -199,6 +279,18 @@ export default function ViewJobs() {
       <JobLimitModal 
         isOpen={showLimitModal} 
         onClose={() => setShowLimitModal(false)} 
+        isSubscribed={isSubscribed}
+      />
+
+      {/* Add DeleteJobModal */}
+      <DeleteJobModal 
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setJobToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        jobTitle={jobToDelete?.title}
       />
 
       <div className="bg-white rounded-lg shadow-custom p-6 transition-all hover:shadow-lg">
@@ -265,11 +357,15 @@ export default function ViewJobs() {
                     <h2 className="text-lg font-semibold text-gray-900 line-clamp-2">{job.title}</h2>
                     <div className="flex items-center space-x-2">
                       {job.agent_state && (
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          job.agent_state === 'running' ? 'bg-green-100 text-green-800' :
-                          job.agent_state === 'stopped' ? 'bg-red-100 text-red-800' :
-                          job.agent_state === 'paused' ? 'bg-gray-100 text-gray-800' : ''
-                        }`}>
+                        <span
+                          className={`px-2 py-1 text-xs font-semibold rounded-full
+                            ${job.agent_state === 'running' ? 'bg-green-100 text-green-800 border border-green-400'
+                              : job.agent_state === 'stopped' ? 'bg-red-100 text-red-700 border border-red-400'
+                              : job.agent_state === 'paused' ? 'bg-gray-900 text-white border border-gray-900'
+                              : ''}
+                          `}
+                          style={{ minWidth: 70, display: 'inline-block', textAlign: 'center' }}
+                        >
                           {job.agent_state}
                         </span>
                       )}
@@ -286,7 +382,6 @@ export default function ViewJobs() {
                   </div>
                   
                   <div className="space-y-2 mb-4">
-                    
                     {/* If file is uploaded, show file name, otherwise show about preview */}
                     {job.file_uploaded ? (
                       <div className="flex items-center text-sm">
@@ -337,10 +432,9 @@ export default function ViewJobs() {
                           disabled={new Date() > new Date(job.job_end_date) || !isSubscribed}
                         >
                           <option value="">Choose an action</option>
-                          <option value="Start">Start</option>
-                          <option value="Stop">Stop</option>
-                          <option value="Pause">Pause</option>
-                          <option value="Resume">Resume</option>
+                          {getValidActions(job).map(action => (
+                            <option key={action} value={action}>{action}</option>
+                          ))}
                         </select>
                         {(!isSubscribed || new Date() > new Date(job.job_end_date)) && (
                           <div className="absolute top-1/2 -translate-y-1/2 right-8">

@@ -1,187 +1,121 @@
 'use client';
 
-import { CancellationWarningModal } from '@/components/modals/CancellationWarningModal';
-import { createBrowserClient } from '@supabase/ssr';
-import { redirect, useRouter } from 'next/navigation';
+import { fetchWithCSRF } from '@/lib/fetchWithCSRF';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-export default function SubscriptionPage() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [subscriptionData, setSubscriptionData] = useState(null);
+export default function Subscription() {
+  const [subscription, setSubscription] = useState(null);
   const [jobCount, setJobCount] = useState(0);
-  const [user, setUser] = useState(null);
-  const [showCancellationWarning, setShowCancellationWarning] = useState(false);
-  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
-
-  // Handle Stripe redirect results
   useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    if (searchParams.get('setup_success') === 'true') {
-      toast.success('Payment method setup successful');
-      // Remove the query parameters
-      window.history.replaceState({}, '', window.location.pathname);
-    } else if (searchParams.get('setup_canceled') === 'true') {
-      toast.info('Payment method setup cancelled');
-      // Remove the query parameters
-      window.history.replaceState({}, '', window.location.pathname);
-    }
+    loadSubscription();
+    loadJobCount();
   }, []);
 
-  // Load subscription data
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) {
-          return {
-            redirect: {
-              destination: '/signin',
-              permanent: false,
-            },
-          };
-        }
-
-        setUser(user);
-
-        // Get subscription status and job count
-        const { data: subscription } = await supabase
-          .from('subscriptions')
-          .select(`
-            status,
-            trial_start,
-            trial_end,
-            subscription_end,
-            stripe_customer_id
-          `)
-          .eq('user_id', user.id)
-          .single();
-
-        // Get job count
-        const { count: jobCountData } = await supabase
-          .from('jobs')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id);
-
-        if (!subscription && !jobCountData) {
-          redirect('/dashboard');
-        }
-
-        setSubscriptionData(subscription);
-        setJobCount(jobCountData || 0);
-      } catch (err) {
-        console.error('Error loading subscription data:', err);
-        setError('Failed to load subscription data');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadData();
-  }, []);
-
-  const handleSubscriptionAction = async (action) => {
-    if (action === 'cancel' && jobCount > 5) {
-      setShowCancellationWarning(true);
-      return;
-    }
-
+  const loadJobCount = async () => {
     try {
-      setLoading(true);
-      const response = await fetch(`/api/subscriptions/${action}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        credentials: 'same-origin'
-      });
-
-      const data = await response.json();
-      
+      const response = await fetchWithCSRF('/api/jobs/count');
       if (!response.ok) {
-        throw new Error(data.error || `Failed to ${action} subscription`);
+        throw new Error('Failed to load job count');
       }
-
-      // Handle successful response
-      if (data.url) {
-        // If we have a URL, redirect to Stripe
-        window.location.href = data.url;
-      } else if (data.success) {
-        // If successful but no URL (e.g., cancellation), refresh the page
-        toast.success(action === 'cancel' ? 'Subscription cancelled' : 'Trial started successfully');
-        router.refresh();
-      }
+      const data = await response.json();
+      setJobCount(data.count || 0);
     } catch (err) {
-      console.error(`Error ${action}ing subscription:`, err);
-      toast.error(`Failed to ${action} subscription`);
-    } finally {
-      setLoading(false);
+      console.error('Error loading job count:', err);
+      toast.error('Failed to load job count');
     }
   };
 
-  const handleBillingPortal = async () => {
+  const loadSubscription = async () => {
     try {
-      setLoading(true);
-      const response = await fetch('/api/subscriptions/portal', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        credentials: 'same-origin'
+      setIsLoading(true);
+      const response = await fetchWithCSRF('/api/subscriptions/check-subscription');
+      if (!response.ok) {
+        throw new Error('Failed to load subscription');
+      }
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to load subscription');
+      }
+      setSubscription(data.subscription);
+    } catch (err) {
+      console.error('Error loading subscription:', err);
+      toast.error('Failed to load subscription');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpgrade = async () => {
+    try {
+      setIsUpdating(true);
+      const response = await fetchWithCSRF('/api/subscriptions/create-checkout', {
+        method: 'POST'
       });
 
-      const data = await response.json();
-      
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to access billing portal');
+        throw new Error('Failed to create checkout session');
+      }
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to create checkout session');
+      }
+
+      // Redirect to Stripe Checkout
+      window.location.href = data.checkoutUrl;
+    } catch (err) {
+      console.error('Error creating checkout session:', err);
+      toast.error('Failed to create checkout session');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleManageBilling = async () => {
+    try {
+      setIsUpdating(true);
+      const response = await fetchWithCSRF('/api/subscriptions/portal', {
+        method: 'POST'
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create portal session');
+      }
+
+      const data = await response.json();
+      if (!data.url) {
+        throw new Error('No portal URL returned');
       }
 
       // Redirect to Stripe Portal
-      if (data.url) {
-        window.location.href = data.url;
-      }
+      window.location.href = data.url;
     } catch (err) {
-      console.error('Error accessing billing portal:', err);
-      toast.error('Failed to access billing portal');
+      console.error('Error creating portal session:', err);
+      toast.error('Failed to open billing portal');
     } finally {
-      setLoading(false);
+      setIsUpdating(false);
     }
   };
 
-  const handleCancellationConfirm = () => {
-    setShowCancellationWarning(false);
-    handleSubscriptionAction('cancel');
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-80px)]">
-        Loading...
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="flex justify-center items-center h-[calc(100vh-80px)] text-red-500">
-        {error}
-      </div>
-    );
-  }
-
-  const isSubscribed = subscriptionData?.status === 'active';
-  const isTrialing = subscriptionData?.status === 'trialing';
-  const trialEnd = subscriptionData?.trial_end ? new Date(subscriptionData.trial_end) : null;
-  const subscriptionEnd = subscriptionData?.subscription_end ? new Date(subscriptionData.subscription_end) : null;
-  const hasStripeAccount = !!subscriptionData?.stripe_customer_id;
+  const isSubscribed = subscription?.status === 'active';
+  const isTrialing = subscription?.status === 'trialing';
+  const hasNoSubscription = !subscription;
+  const isCanceled = subscription?.status === 'canceled';
+  const trialEnd = subscription?.trial_end ? new Date(subscription.trial_end) : null;
+  const subscriptionEnd = subscription?.subscription_end ? new Date(subscription.subscription_end) : null;
+  const hasStripeAccount = !!subscription?.stripe_customer_id;
 
   // Calculate days remaining for trial or subscription
   const now = new Date();
@@ -194,13 +128,6 @@ export default function SubscriptionPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <CancellationWarningModal 
-        isOpen={showCancellationWarning}
-        onClose={() => setShowCancellationWarning(false)}
-        onConfirm={handleCancellationConfirm}
-        jobCount={jobCount}
-      />
-
       <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h1 className="text-3xl font-bold">Choose Your Plan</h1>
@@ -230,6 +157,10 @@ export default function SubscriptionPage() {
             <ul className="space-y-4 mb-8">
               <li className="flex items-center">
                 <span className="mr-3 text-green-500">✓</span>
+                14 days free trial
+              </li>
+              <li className="flex items-center">
+                <span className="mr-3 text-green-500">✓</span>
                 Unlimited jobs
               </li>
               <li className="flex items-center">
@@ -257,32 +188,23 @@ export default function SubscriptionPage() {
 
         {/* Action Button */}
         <div className="text-center mb-12">
-          {isSubscribed ? (
+          {(hasNoSubscription || isCanceled) ? (
             <button 
-              onClick={() => handleSubscriptionAction('cancel')}
-              className="px-8 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-              disabled={loading}
-            >
-              {loading ? 'Processing...' : 'Cancel Subscription'}
-            </button>
-          ) : (
-            <button 
-              onClick={() => handleSubscriptionAction('create-checkout')}
+              onClick={handleUpgrade}
               className="px-8 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
-              disabled={loading}
+              disabled={isUpdating}
             >
-              {loading ? 'Processing...' : (isTrialing ? 'Upgrade to Pro' : 'Start 14-Day Free Trial')}
+              {isUpdating ? 'Processing...' : 'Upgrade to Pro'}
             </button>
-          )}
-          {hasStripeAccount && (
+          ) : (isSubscribed || isTrialing) && hasStripeAccount ? (
             <button
-              className="ml-4 px-8 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              onClick={handleBillingPortal}
-              disabled={loading}
+              className="px-8 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              onClick={handleManageBilling}
+              disabled={isUpdating}
             >
-              {loading ? 'Loading...' : 'Manage Billing'}
+              {isUpdating ? 'Loading...' : 'Manage Billing'}
             </button>
-          )}
+          ) : null}
         </div>
 
         {/* Current Usage */}

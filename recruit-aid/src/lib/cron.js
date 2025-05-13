@@ -2,6 +2,8 @@ import { stripe } from '@/lib/stripe';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
+//need to use the service role key when it comes to cron supabase functionalities. hence recreating the below
+//instead of importing it
 /**
  * Creates a server-side Supabase client for cron operations
  * @returns {Promise<Object>} Supabase client instance

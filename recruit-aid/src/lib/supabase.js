@@ -1,6 +1,5 @@
 // Browser client
 import { createBrowserClient } from '@supabase/ssr';
-import { uploadVectors } from './info-upload';
 
 export function createClient() {
   return createBrowserClient(
@@ -25,6 +24,10 @@ export async function signInWithEmail(email) {
 export async function signOut() {
   const supabase = createClient();
   const { error } = await supabase.auth.signOut();
+  // Clear CSRF token cookie (client-side)
+  if (typeof document !== 'undefined') {
+    document.cookie = 'csrf_token=; Max-Age=0; path=/;';
+  }
   return { error };
 }
 
@@ -50,354 +53,21 @@ export async function getUser() {
   return { user, error };
 }
 
-// Jobs table functions
-export async function createJob(jobData) {
+//while there is a member route that has a GET method to get the info of member (it gets only id, name & email by design)
+//it is called numerously, and I do not want to return the full member object in places tht it is not need in
+//so I created this function to get the full member information fo rthe only place that needs it completely
+export async function getFullMemberInformation(memberId) {
   const supabase = createClient();
-  
-  // Get the current user
-  const { user, error: userError } = await getUser();
-  
-  if (userError) {
-    return { error: userError };
-  }
-  console.log('jobData', jobData);
-  let file_content = null;
-  if (jobData.file_content) {
-    file_content = jobData.file_content;
-  }
-  //remove file_content from jobData schema regardless of if there is file content passed or aretText content. It is present in the schema but not in the db.
-  delete jobData.file_content;
-
-  console.log('jobData updated to remove file_content', jobData);
-
-  const jobWithUserId = {
-    ...jobData,
-    user_id: user.id,
-    created_at: new Date().toISOString(),
-    file_uploaded: jobData.file_uploaded || false,
-    original_filename: jobData.original_filename || null
-  };
-  
-  // Insert the job into the Jobs table
-  const { data, error } = await supabase
-    .from('jobs')
-    .insert(jobWithUserId)
-    .select()
-    .single();
-
-  if (!error && data) {
-    try {
-      //get the content to upload to pinecone. if file get content from input, if textAreas, upload to db, it dds to what is there already & then take from result of db & upload to pinecone
-      let content_to_upload = null;
-      if (file_content) {
-        content_to_upload = file_content;
-        console.log("with file upload");
-      } else if(jobData.about || jobData.more_details) {
-        content_to_upload = data.about + data.more_details;
-        console.log("with text upload, adding about and more details");
-      }
-
-      //pineconeInfp dict contains all processed info that pinecone needs.
-      let pineconeInfo = {
-        id: data.id,
-        content_to_upload: content_to_upload  
-      }
-      // create vectors in Pinecone
-      await uploadVectors(pineconeInfo);
-    } catch (pineconeError) {
-      console.error('Error updating Pinecone vectors:', pineconeError);
-      // Don't throw the error as the DB update was successful
-    }
-  }
-  return { job: data, error };
-}
-
-export async function getJobs() {
-  const supabase = createClient();
-  
-  // Get the current user
-  const { user, error: userError } = await getUser();
-  
-  if (userError) {
-    return { error: userError };
-  }
-  
-  // Get all jobs for the current user
-  const { data, error } = await supabase
-    .from('jobs')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false });
-  
-  return { jobs: data, error };
-}
-
-export async function getJobById(jobId) {
-  const supabase = createClient();
-  
-  // Get the job by ID
-  const { data, error } = await supabase
-    .from('jobs')
-    .select('*')
-    .eq('id', jobId)
-    .single();
-  
-  return { job: data, error };
-}
-
-//the current implementation here is not complete. First there is no need updatting the vector db
-//with the full info from db . only update should be done to the vector db when the user updates 
-//the file or about & more details sections of the job. 
-export async function updateJob(jobId, jobData) {
-  const supabase = createClient();
-  
-  let file_content = null;
-  if (jobData.file_content) {
-    file_content = jobData.file_content;
-    delete jobData.file_content;
-  }
-  // Update the job
-  const { data, error } = await supabase
-    .from('jobs')
-    .update(jobData)
-    .eq('id', jobId)
-    .select()
-    .single();
-  
-  if (!error && data) {
-    try {
-      //get the content to upload to pinecone. if file get content from input, if textAreas, upload to db, it dds to what is there already & then take from result of db & upload to pinecone
-      let content_to_upload = null;
-      if (file_content) {
-        content_to_upload = file_content;
-      } else if(jobData.about || jobData.more_details) {
-        content_to_upload = data.about + data.more_details;
-      }
-
-      //pineconeInfp dict contains all processed info that pinecone needs.
-      let pineconeInfo = {
-        id: jobId,
-        content_to_upload: content_to_upload  
-      }
-      // create vectors in Pinecone
-      await uploadVectors(pineconeInfo);
-    } catch (pineconeError) {
-      console.error('Error updating Pinecone vectors:', pineconeError);
-      // Don't throw the error as the DB update was successful
-    }
-  }
-  
-  return { job: data, error };
-}
-
-export async function deleteJob(jobId) {
-  const supabase = createClient();
-  
-  // Delete the job
-  const { error } = await supabase
-    .from('jobs')
-    .delete()
-    .eq('id', jobId);
-  
-  return { error };
-}
-
-// Profile functions
-export async function getProfile() {
-  const supabase = createClient();
-  
-  // Get the current user
-  const { user, error: userError } = await getUser();
-  
-  if (userError) {
-    return { error: userError };
-  }
-  
-  // Get the profile for the current user
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single();
-  
-  return { profile: data, error };
-}
-
-export async function createProfile(profileData) {
-  const supabase = createClient();
-  
-  // Get the current user
-  const { user, error: userError } = await getUser();
-  
-  if (userError) {
-    return { error: userError };
-  }
-  
-  // Create the profile with user ID and ensure email is from auth
-  const { data, error } = await supabase
-    .from('profiles')
-    .insert({
-      id: user.id,
-      name: profileData.name,
-      email: user.email, // Always use the auth email
-      company: profileData.company,
-      role: profileData.role,
-      phone: profileData.phone,
-      timezone: profileData.timezone,
-      sender: profileData.sender || []
-    })
-    .select()
-    .single();
-  
-  return { profile: data, error };
-}
-
-export async function updateProfile(profileData) {
-  const supabase = createClient();
-  
-  // Get the current user
-  const { user, error: userError } = await getUser();
-  
-  if (userError) {
-    return { error: userError };
-  }
-  
-  // Update the profile and ensure email is from auth
-  const { data, error } = await supabase
-    .from('profiles')
-    .update({
-      name: profileData.name,
-      email: user.email, // Always use the auth email
-      company: profileData.company,
-      role: profileData.role,
-      phone: profileData.phone,
-      timezone: profileData.timezone,
-      sender: profileData.sender || undefined // Only update if provided
-    })
-    .eq('id', user.id)
-    .select()
-    .single();
-  
-  return { profile: data, error };
-}
-
-// Initialize user profile after signup
-export async function initializeUserProfile() {
-  const supabase = createClient();
-  
-  // Get the current user
-  const { user, error: userError } = await getUser();
-  
-  if (userError) {
-    return { error: userError };
-  }
-  
-  // Check if profile already exists
-  const { data: existingProfile, error: profileError } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('id', user.id)
-    .single();
-  
-  // If profile doesn't exist, create it with basic info
-  if (!existingProfile && !profileError) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .insert({
-        id: user.id,
-        name: user.user_metadata?.name || user.email?.split('@')[0] || '',
-        email: user.email,
-        timezone: 'America/New_York', // Default timezone
-        sender: [] // Initialize with empty array
-      })
-      .select()
-      .single();
-    
-    return { profile: data, error };
-  }
-  
-  return { profile: existingProfile, error: profileError };
-}
-
-// Update sender emails
-export async function updateSenderEmails(senderEmails) {
-  const supabase = createClient();
-  
-  // Get the current user
-  const { user, error: userError } = await getUser();
-  
-  if (userError) {
-    return { error: userError };
-  }
-  
-  // Ensure each item in the array is properly formatted
-  const formattedSenderEmails = senderEmails.map(item => {
-    // If it's already an object with email and refresh_token, return as is
-    if (typeof item === 'object' && item.email) {
-      return item;
-    }
-    
-    // If it's a string, convert to object format without refresh_token
-    return { email: item };
-  });
-  
-  // Update the sender field in the profile
-  const { data, error } = await supabase
-    .from('profiles')
-    .update({
-      sender: formattedSenderEmails
-    })
-    .eq('id', user.id)
-    .select()
-    .single();
-  
-  return { profile: data, error };
-}
-
-// Members functions
-export async function createMember(jobId, memberData) {
-  const supabase = createClient();
-  
-  // Insert the member
-  const { data, error } = await supabase
-    .from('members')
-    .insert({
-      job_id: jobId,
-      name_email: {
-        name: memberData.name,
-        email: memberData.email
-      }
-    })
-    .select()
-    .single();
-  
-  return { member: data, error };
-}
-
-export async function getMembers(jobId) {
-  const supabase = createClient();
-  
-  // Get all members for the job
   const { data, error } = await supabase
     .from('members')
     .select('*')
-    .eq('job_id', jobId)
-    .order('created_at', { ascending: false });
-  
-  return { members: data, error };
+    .eq('id', memberId)
+    .single();
+
+  if (error) throw error;
+  return data;
 }
 
-export async function deleteMember(memberId) {
-  const supabase = createClient();
-  
-  // Delete the member
-  const { error } = await supabase
-    .from('members')
-    .delete()
-    .eq('id', memberId);
-  
-  return { error };
-}
 
 export async function updateAgentState(jobId, newState) {
   try {

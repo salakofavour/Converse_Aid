@@ -1,7 +1,7 @@
 'use client';
 
+import { fetchWithCSRF } from '@/lib/fetchWithCSRF';
 import { extractTextFromFile, validateFile } from '@/lib/file-processor';
-import { createMember, getJobById, getMembers, getProfile, updateJob } from '@/lib/supabase';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -43,28 +43,28 @@ export default function EditJob() {
   const [moreDetailsWordCount, setMoreDetailsWordCount] = useState(0);
   const WORD_LIMIT = 1000;
 
-  //load job information
+  // Load job information
   useEffect(() => {
     loadJob();
-  }, [params.id, router]);
+  }, [params.id]);
 
-  //load sender email
+  // Load sender email
   useEffect(() => {
     loadSenderEmails();
   }, []);
 
-  //load members
-  useEffect(() =>{
+  // Load members
+  useEffect(() => {
     loadMembers();
-  }, [params.id])
+  }, [params.id]);
 
   const loadJob = async () => {
     try {
-      const { job, jobError } = await getJobById(params.id);
-      
-      if (jobError){
-        throw new Error(jobError.message);
+      const response = await fetchWithCSRF(`/api/jobs/${params.id}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch job');
       }
+      const { job } = await response.json();
       
       if (!job) {
         throw new Error('Job not found');
@@ -112,11 +112,13 @@ export default function EditJob() {
   async function loadSenderEmails() {
     setIsLoadingSenderEmails(true);
     try {
-      const { profile, error } = await getProfile();
-      if (error) {
-        console.error('Error fetching profile:', error);
-        setSenderEmailError('Failed to load sender emails');
-      } else if (profile && profile.sender) {
+      const response = await fetchWithCSRF('/api/profile');
+      if (!response.ok) {
+        throw new Error('Failed to fetch profile');
+      }
+      const { profile } = await response.json();
+      
+      if (profile && profile.sender) {
         const emails = profile.sender.map(item => 
           typeof item === 'string' ? item : item.email
         );
@@ -135,26 +137,25 @@ export default function EditJob() {
     
     try {
       setIsLoadingMembers(true);
-      const { members: membersData, error } = await getMembers(params.id);
-      
-      if (error) {
-        console.error('Error loading members:', error);
-      } else {
-        setMembers(membersData || []);
+      const response = await fetchWithCSRF(`/api/members?jobId=${params.id}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch members');
       }
+      const { members: membersData } = await response.json();
+      setMembers(membersData || []);
     } catch (err) {
       console.error('Error loading members:', err);
+      toast.error('Failed to load members');
     } finally {
       setIsLoadingMembers(false);
     }
   }
 
-
   const countWords = (text) => {
     return text.trim().split(/\s+/).filter(word => word.length > 0).length;
   };
 
-  //handle input changes
+  // Handle input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
     
@@ -207,10 +208,9 @@ export default function EditJob() {
 
   const handleSubmit = async (e) => {
     try {
-        e.preventDefault();
-        setIsSubmitting(true);
-        setError(null);
-
+      e.preventDefault();
+      setIsSubmitting(true);
+      setError(null);
 
       let jobData = {
         title: formData.title,
@@ -232,18 +232,20 @@ export default function EditJob() {
           toast.error('Failed to process file: ' + error);
           return;
         }
-        //add the file content to the jobData dict that will be passed to update job
         jobData.file_content = content;
-
-      } else if (!formData.file_uploaded) {
-        // Using text areas
-        jobData.about = formData.about;
-        jobData.more_details = formData.moreDetails;
       }
 
-      const { error: updateError } = await updateJob(params.id, jobData);
+      const response = await fetchWithCSRF(`/api/jobs/${params.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(jobData),
+      });
 
-      if (updateError) throw new Error(updateError.message);
+      if (!response.ok) {
+        throw new Error('Failed to update job');
+      }
 
       toast.success('Job updated successfully!');
       router.push(`/dashboard/view-jobs/${params.id}`);
@@ -255,89 +257,101 @@ export default function EditJob() {
     }
   };
 
-    // Function to validate email format
-    const validateEmail = (email) => {
-        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return re.test(email);
-    };
-      
-    // Handle adding a member
-    const handleAddMember = async () => {
-        // Reset error state
-        setEmailError('');
-        
-        // Validate inputs
-        if (!memberName.trim()) {
-            return; // Don't add if name is empty
-        }
-        
-        if (!validateEmail(memberEmail)) {
-            setEmailError('Invalid email format');
-            return;
-        }
-        
-        try {
-            // Add to members list
-            const { member, error } = await createMember(params.id, {
-            name: memberName.trim(),
-            email: memberEmail.trim()
-            });
-            
-            if (error) {
-            throw error;
-            }
-            
-            // Update local state
-            setMembers(prev => [member, ...prev]);
-            
-            // Show success message briefly
-            setShowAddedMessage(true);
-            setTimeout(() => {
-            setShowAddedMessage(false);
-            }, 2000);
-            
-            // Clear input fields
-            setMemberName('');
-            setMemberEmail('');
-            
-        } catch (err) {
-            console.error('Error adding member:', err);
-            setError('Failed to add member');
-        }
-    };
+  // Function to validate email format
+  const validateEmail = (email) => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  };
     
-    // Handle removing a member
-    const handleRemoveMember = async (memberId) => {
-        try {
-            const { error } = await deleteMember(memberId);
-            
-            if (error) {
-            throw error;
-            }
-            
-            // Update local state
-            setMembers(prev => prev.filter(m => m.id !== memberId));
-            
-        } catch (err) {
-            console.error('Error removing member:', err);
-            setError('Failed to remove member');
-        }
-    };
+  // Handle adding a member
+  const handleAddMember = async () => {
+    // Reset error state
+    setEmailError('');
+    
+    // Validate inputs
+    if (!memberName.trim()) {
+      toast.error('Both Name & Email are required');
+      return; // Don't add if name is empty
+    }
+    
+    if (!validateEmail(memberEmail)) {
+      setEmailError('Invalid email format');
+      return;
+    }
+    
+    try {
+      const response = await fetchWithCSRF('/api/members', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jobId: params.id,
+          name: memberName.trim(),
+          email: memberEmail.trim()
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add member');
+      }
+
+      const { member } = await response.json();
+      setMembers(prev => [member, ...prev]);
+      
+      // Show success message briefly
+      setShowAddedMessage(true);
+      setTimeout(() => {
+        setShowAddedMessage(false);
+      }, 2000);
+      
+      // Clear input fields
+      setMemberName('');
+      setMemberEmail('');
+      
+    } catch (err) {
+      console.error('Error adding member:', err);
+      toast.error('Failed to add member');
+    }
+  };
+    
+  // Handle removing a member
+  const handleRemoveMember = async (memberId) => {
+    if (!window.confirm('Are you sure you want to remove this member?')) {
+      return;
+    }
+
+    try {
+      const response = await fetchWithCSRF(`/api/members/${memberId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete member');
+      }
+
+      setMembers(prev => prev.filter(m => m.id !== memberId));
+      toast.success('Member removed successfully');
+    } catch (err) {
+      console.error('Error removing member:', err);
+      toast.error('Failed to remove member');
+    }
+  };
 
   if (isLoading) {
     return (
-        <div className="flex justify-center items-center min-h-screen">
-          <div className="animate-pulse flex flex-col items-center">
-            <div className="rounded-full bg-primary-light h-12 w-12 mb-4"></div>
-            <div className="text-gray-600">Loading job details...</div>
-          </div>
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="rounded-full bg-primary-light h-12 w-12 mb-4"></div>
+          <div className="text-gray-600">Loading job details...</div>
         </div>
-      );
+      </div>
+    );
   }
 
   return (
     <div className="max-w-3xl mx-auto py-10">
-        <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Edit Job</h1>
         <Link href={`/dashboard/view-jobs/${params.id}`} className="btn btn-outline-primary transition-all hover:shadow-md">
           Cancel
@@ -346,13 +360,12 @@ export default function EditJob() {
 
       <div className="bg-white rounded-lg shadow-custom p-6 transition-all hover:shadow-lg">
         {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
-                <span className="block sm:inline">{error}</span>
-            </div>
-            )}
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
+            <span className="block sm:inline">{error}</span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-            
           {/* Basic Job Details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
@@ -450,45 +463,45 @@ export default function EditJob() {
             {!formData.file_uploaded && (
               <>
                 <div className="mb-4">
-                    <label htmlFor="about" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="about" className="block text-sm font-medium text-gray-700">
                     About Job
-                    </label>
-                    <p className="text-xs text-gray-500">Enter information about the job, each on a new line</p>
-                    <textarea
-                        id="about"
-                        name="about"
-                        value={formData.about}
-                        onChange={handleChange}
-                        rows={5}
-                        className="form-textarea block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
-                        placeholder="Enter job information, one per line">
-                    </textarea>
-                    <div className={`text-sm mt-1 text-right ${
-                        aboutWordCount === WORD_LIMIT ? 'text-yellow-600' : 'text-gray-500'
-                        }`}>
-                        {aboutWordCount}/{WORD_LIMIT} words
-                    </div>
+                  </label>
+                  <p className="text-xs text-gray-500">Enter information about the job, each on a new line</p>
+                  <textarea
+                    id="about"
+                    name="about"
+                    value={formData.about}
+                    onChange={handleChange}
+                    rows={5}
+                    className="form-textarea block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
+                    placeholder="Enter job information, one per line"
+                  />
+                  <div className={`text-sm mt-1 text-right ${
+                    aboutWordCount === WORD_LIMIT ? 'text-yellow-600' : 'text-gray-500'
+                  }`}>
+                    {aboutWordCount}/{WORD_LIMIT} words
+                  </div>
                 </div>
 
                 <div>
-                    <label htmlFor="moreDetails" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="moreDetails" className="block text-sm font-medium text-gray-700">
                     More Details
-                    </label>
-                    <p className="text-xs text-gray-500">Enter more details about the job, each on a new line</p>
-                    <textarea
-                        id="moreDetails"
-                        name="moreDetails"
-                        value={formData.moreDetails}
-                        onChange={handleChange}
-                        rows={5}
-                        className="form-textarea block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
-                        placeholder="Enter more details about the job, one per line">
-                    </textarea>
-                    <div className={`text-sm mt-1 text-right ${
-                      moreDetailsWordCount === WORD_LIMIT ? 'text-yellow-600' : 'text-gray-500'
-                    }`}>
-                      {moreDetailsWordCount}/{WORD_LIMIT} words
-                    </div>
+                  </label>
+                  <p className="text-xs text-gray-500">Enter more details about the job, each on a new line</p>
+                  <textarea
+                    id="moreDetails"
+                    name="moreDetails"
+                    value={formData.moreDetails}
+                    onChange={handleChange}
+                    rows={5}
+                    className="form-textarea block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
+                    placeholder="Enter more details about the job, one per line"
+                  />
+                  <div className={`text-sm mt-1 text-right ${
+                    moreDetailsWordCount === WORD_LIMIT ? 'text-yellow-600' : 'text-gray-500'
+                  }`}>
+                    {moreDetailsWordCount}/{WORD_LIMIT} words
+                  </div>
                 </div>
               </>
             )}
@@ -633,7 +646,6 @@ export default function EditJob() {
               </div>
             )}
           </div>
-          
 
           {/* Action Buttons */}
           <div className="flex justify-end space-x-4 pt-6">

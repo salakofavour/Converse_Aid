@@ -1,12 +1,12 @@
 import { endAgent, initiateAgent } from '@/lib/aws-agent-call';
-import { createClient } from '@/lib/supabase';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
 /**
  * Valid agent states
  */
 export const AGENT_STATES = {
-  RUNNING: 'Running',
-  STOPPED: 'Stopped',
-  PAUSED: 'Paused'
+  RUNNING: 'running',
+  STOPPED: 'stopped',
+  PAUSED: 'paused'
 };
 
 /**
@@ -37,7 +37,7 @@ const STATE_TRANSITIONS = {
  */
 export async function getAgentState(jobId) {
   try {
-    const supabase = createClient();
+    const supabase = await createSupabaseServerClient();
 
     // Get job to verify ownership and get state
     const { data: job, error: jobError } = await supabase
@@ -77,7 +77,7 @@ export async function getAgentState(jobId) {
  */
 export async function updateAgentState(jobId, action) {
   try {
-    const supabase = createClient();
+    const supabase = await createSupabaseServerClient();
 
     // Get job to verify ownership and current state
     const { data: job, error: jobError } = await supabase
@@ -102,23 +102,33 @@ export async function updateAgentState(jobId, action) {
       throw new Error('Invalid action');
     }
 
-    // Validate state transition
+    // First check if job is active
+    if (job.status === 'closed') {
+      throw new Error('Cannot modify agent state for closed jobs');
+    }
+
+    // Validate state transition based on current agent state
     const currentState = job.agent_state || AGENT_STATES.STOPPED;
-    if (!isValidStateTransition(job.status, actionConfig.state)) {
-      throw new Error(`Invalid state transition from ${currentState} to ${actionConfig.state}`);
+    if (!isValidStateTransition(currentState, actionConfig.state)) {
+      throw new Error(
+        `Invalid state transition: Cannot change from ${currentState} to ${actionConfig.state}. ` +
+        `Allowed transitions from ${currentState} are: ${STATE_TRANSITIONS[currentState].join(', ')}`
+      );
+    }
+
+    if (actionConfig.state === AGENT_STATES.RUNNING) {
+      console.log("starting or resuming agent");
+      await endAgent(jobId);
+      await initiateAgent(jobId);
+    } else if (actionConfig.state === AGENT_STATES.STOPPED || actionConfig.state === AGENT_STATES.PAUSED) {
+      console.log("stopping or pausing agent");
+      await endAgent(jobId);
     }
 
     //after validating state change is valid & correct parameters are provided, send a request to the api gateway endpoint to initiate or end the agent
     //send the job id, and the action to initiate or end the agent
     //if the action is to start or resume the agent, end any agent with the same name first and then initiate the agent
     //if the action is to stop or pause the agent, end the agent
-    if (actionConfig.state === AGENT_STATES.RUNNING) {
-      await endAgent(jobId);
-      await initiateAgent(jobId);
-    } else if (actionConfig.state === AGENT_STATES.STOPPED || actionConfig.state === AGENT_STATES.PAUSED) {
-      await endAgent(jobId);
-    }
-
     // Update job state in db
     const { data: updatedJob, error: updateError } = await supabase
       .from('jobs')

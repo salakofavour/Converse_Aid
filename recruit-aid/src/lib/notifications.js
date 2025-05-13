@@ -20,7 +20,7 @@ export async function sendSubscriptionNotification(email, daysUntilExpiry, jobCo
             <li>You'll lose access to premium features</li>
           </ul>
           <p>To keep all your jobs and maintain access to premium features, please renew your subscription.</p>
-          <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings/subscription" style="display: inline-block; background-color: #0070f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 16px;">
+          <a href="${process.env. PUBLIC_APP_URL}/dashboard/settings/subscription" style="display: inline-block; background-color: #0070f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 16px;">
             Renew Subscription
           </a>
         </div>

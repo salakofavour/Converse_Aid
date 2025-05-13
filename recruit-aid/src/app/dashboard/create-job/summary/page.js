@@ -1,6 +1,6 @@
 'use client';
 
-import { createJob } from '@/lib/supabase';
+import { fetchWithCSRF } from '@/lib/fetchWithCSRF';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { FaFileAlt } from 'react-icons/fa';
@@ -32,16 +32,18 @@ export default function JobSummary() {
           }
         }
       }
+    } else {
+      router.push('/dashboard/create-job/template');
     }
-  }, []);
+  }, [router]);
 
   const handleSubmit = async () => {
-    if (!formData) {console.log('no form data'); return;}
+    if (!formData) {
+      toast.error('No form data found');
+      return;
+    }
 
-    console.log('formData', formData);
-    
     setIsSubmitting(true);
-    console.log('submitting usestate');
     try {
       let jobData = {
         title: formData.title,
@@ -72,19 +74,25 @@ export default function JobSummary() {
           return;
         }
         jobData.file_content = content;
-      }else {
+      } else {
         // Using text areas
         jobData.about = formData.about;
         jobData.more_details = formData.moreDetails;
       }
-      console.log('initiating createJob with');
-      const { job, error } = await createJob(jobData);
-      console.log('job created');
-      
 
-      if (error) {
-        throw error;
+      const response = await fetchWithCSRF('/api/jobs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(jobData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create job');
       }
+
+      const { job } = await response.json();
 
       // Clear storage
       localStorage.removeItem('jobFormData');
@@ -102,12 +110,16 @@ export default function JobSummary() {
   };
 
   if (!formData) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex justify-center items-center h-[calc(100vh-80px)]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
   return (
     <div className="max-w-3xl mx-auto py-10">
-      <h1 className="text-2xl font-bold mb-6">Review Job Details</h1>
+      <h1 className="text-2xl font-bold mb-6">Job Summary</h1>
       <div className="bg-white rounded-lg shadow-custom p-6">
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4">

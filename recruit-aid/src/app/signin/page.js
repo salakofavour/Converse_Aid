@@ -1,6 +1,6 @@
 'use client';
 
-import { signInWithEmail } from '@/lib/supabase';
+import { fetchWithCSRF } from '@/lib/fetchWithCSRF';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -15,10 +15,18 @@ export default function SignIn() {
     setMessage({ type: '', text: '' });
 
     try {
-      const { error } = await signInWithEmail(email);
+      const response = await fetchWithCSRF('/api/auth/signin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email })
+      });
+
+      const data = await response.json();
       
-      if (error) {
-        throw error;
+      if (!response.ok) {
+        throw new Error(data.error || 'An error occurred during sign in.');
       }
       
       setMessage({

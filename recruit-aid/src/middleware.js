@@ -1,3 +1,4 @@
+import { generateCSRFToken } from '@/lib/csrf';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 
@@ -6,7 +7,7 @@ export async function middleware(request) {
     request,
   });
 
-  const supabase = createServerClient(
+  const supabase = createServerClient (
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
@@ -15,7 +16,7 @@ export async function middleware(request) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value));
+          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value, options));
           supabaseResponse = NextResponse.next({
             request,
           });
@@ -27,13 +28,21 @@ export async function middleware(request) {
     }
   );
 
-  // Do not run code between createServerClient and
+  // Do not run code between createSupabaseServerClient and
   // supabase.auth.getUser(). A simple mistake could make it very hard to debug
   // issues with users being randomly logged out.
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // If user is authenticated, ensure CSRF token cookie is set
+  if (user) {
+    const csrfCookie = request.cookies.getAll().find(c => c.name === 'csrf_token');
+    if (!csrfCookie) {
+      generateCSRFToken(supabaseResponse); // Set CSRF token cookie
+    }
+  }
 
   // If user is not signed in and the current path is not / or /signin or /signup
   // redirect the user to /

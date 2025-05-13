@@ -1,33 +1,15 @@
-import { createServerClient } from '@supabase/ssr';
+import { validateCSRFToken } from '@/lib/csrf';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
-    // Verify CSRF protection
-    const requestedWith = request.headers.get('x-requested-with');
-    if (!requestedWith || requestedWith !== 'XMLHttpRequest') {
-      return NextResponse.json(
-        { error: 'Invalid request' },
-        { status: 403 }
-      );
+    const csrfError = await validateCSRFToken(request);
+    if (csrfError) {
+      return NextResponse.json({ error: csrfError }, { status: 403 });
     }
 
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              request.cookies.set(name, value, options)
-            );
-          },
-        },
-      }
-    );
+    const supabase = await createSupabaseServerClient();
 
     const { newEmail } = await request.json();
 

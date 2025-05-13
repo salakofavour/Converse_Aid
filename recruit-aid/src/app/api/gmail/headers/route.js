@@ -1,5 +1,5 @@
 import { getMessageHeaders, refreshAccessToken } from '@/lib/email';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { NextResponse } from 'next/server';
 
 export async function GET(request) {
@@ -16,7 +16,7 @@ export async function GET(request) {
     }
 
     // Get authenticated user and their profile
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createSupabaseServerClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError) throw new Error('Failed to get authenticated user');
 

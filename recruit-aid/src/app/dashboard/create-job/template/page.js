@@ -1,7 +1,7 @@
 'use client';
 
+import { fetchWithCSRF } from '@/lib/fetchWithCSRF';
 import { validateFile } from '@/lib/file-processor';
-import { getProfile } from '@/lib/supabase';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -17,9 +17,9 @@ export default function JobTemplate() {
     moreDetails: '',
     senderEmail: ''
   });
-  
   const [dateError, setDateError] = useState('');
-  const [submitError, setSubmitError] = useState('');
+  const [submitError, setSubmitError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [senderEmails, setSenderEmails] = useState([]);
   const [isLoadingSenderEmails, setIsLoadingSenderEmails] = useState(true);
   const [senderEmailError, setSenderEmailError] = useState('');
@@ -28,17 +28,18 @@ export default function JobTemplate() {
   const [aboutWordCount, setAboutWordCount] = useState(0);
   const [moreDetailsWordCount, setMoreDetailsWordCount] = useState(0);
   const WORD_LIMIT = 1000;
-  
-  // Get sender emails from profile
+
+  // Load sender emails from profile
   useEffect(() => {
     async function loadSenderEmails() {
       setIsLoadingSenderEmails(true);
       try {
-        const { profile, error } = await getProfile();
-        if (error) {
-          console.error('Error fetching profile:', error);
-          setSenderEmailError('Failed to load sender emails');
-        } else if (profile && profile.sender) {
+        const response = await fetchWithCSRF('/api/profile');
+        if (!response.ok) {
+          throw new Error('Failed to fetch profile');
+        }
+        const { profile } = await response.json();
+        if (profile && profile.sender) {
           const emails = profile.sender.map(item => 
             typeof item === 'string' ? item : item.email
           );
@@ -54,12 +55,28 @@ export default function JobTemplate() {
     
     loadSenderEmails();
   }, []);
-  
+
   // Function to count words in text
   const countWords = (text) => {
     return text.trim().split(/\s+/).filter(word => word.length > 0).length;
   };
-  
+
+  // Get today's date in YYYY-MM-DD format
+  const getTodayFormatted = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+
+  // Get minimum end date (start date + 1 day)
+  const getMinEndDate = () => {
+    if (!formData.jobStartDate) return getTodayFormatted();
+    const startDate = new Date(formData.jobStartDate);
+    const minEndDate = new Date(startDate);
+    minEndDate.setDate(minEndDate.getDate() + 1);
+    return minEndDate.toISOString().split('T')[0];
+  };
+
+  // Handle input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
     
@@ -80,8 +97,13 @@ export default function JobTemplate() {
       ...prev,
       [name]: value
     }));
+
+    // Clear date error when dates are changed
+    if (name === 'jobStartDate' || name === 'jobEndDate') {
+      setDateError('');
+    }
   };
-  
+
   // Validate dates whenever they change
   useEffect(() => {
     validateDates();
@@ -110,31 +132,24 @@ export default function JobTemplate() {
       setDateError('');
     }
   };
-  
-  // Format date for min attribute (prevents selecting dates before today)
-  const getTodayFormatted = () => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-  
-  // Calculate minimum end date based on selected start date
-  const getMinEndDate = () => {
-    if (!formData.jobStartDate) return getTodayFormatted();
-    
-    const startDate = new Date(formData.jobStartDate);
-    const minEndDate = new Date(startDate);
-    minEndDate.setDate(startDate.getDate() + 1);
-    
-    const year = minEndDate.getFullYear();
-    const month = String(minEndDate.getMonth() + 1).padStart(2, '0');
-    const day = String(minEndDate.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-  
-  // handle form submission
+
+  // // Validate file
+  // const validateFile = (file) => {
+  //   const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+  //   const maxSize = 15 * 1024 * 1024; // 15MB
+
+  //   if (!validTypes.includes(file.type)) {
+  //     return { isValid: false, error: 'Please upload a PDF, DOC, DOCX or TXT file' };
+  //   }
+
+  //   if (file.size > maxSize) {
+  //     return { isValid: false, error: 'File size must be less than 15MB' };
+  //   }
+
+  //   return { isValid: true };
+  // };
+
+  // Handle form submission
   const handleSubmit = async () => {
     // Validate required fields
     if (!formData.title || !formData.jobStartDate || !formData.jobEndDate || !formData.senderEmail) {
@@ -176,13 +191,7 @@ export default function JobTemplate() {
     // Navigate to the summary page
     router.push('/dashboard/create-job/summary');
   };
-  
-  // Convert textarea input to bullet points for preview
-  const formatBulletPoints = (text) => {
-    if (!text) return [];
-    return text.split('\n').filter(line => line.trim() !== '').map(line => line.trim());
-  };
-  
+
   return (
     <div className="max-w-3xl mx-auto py-10">
       <h1 className="text-2xl font-bold mb-6">Create Job Template</h1>
@@ -193,7 +202,10 @@ export default function JobTemplate() {
           </div>
         )}
         
-        <div className="space-y-6">
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          handleSubmit();
+        }} className="space-y-6">
           <div className="border-b border-gray-200 pb-6">
             <h2 className="text-xl font-semibold mb-4">Job Details</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -250,7 +262,7 @@ export default function JobTemplate() {
               </div>
             </div>
           </div>
-          
+
           <div className="border-b border-gray-200 pb-6">
             <h2 className="text-xl font-semibold mb-4">Input Knowledge Base by</h2>
             
@@ -317,62 +329,61 @@ export default function JobTemplate() {
 
             {/* About and More Details sections */}
             {!selectedFile && (
-              <>
-                <div className="border-b border-gray-200 pb-6">
-                  <h2 className="text-xl font-semibold mb-4">About Job*</h2>
-                  <div className="space-y-2">
-                    <p className="text-sm text-gray-600">Enter each information on a new line. These will be formatted as bullet points.</p>
-                    <div className="relative">
-                      <textarea
-                        id="about"
-                        name="about"
-                        rows="5"
-                        className={`form-control focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-all w-full ${
-                          aboutWordCount === WORD_LIMIT ? 'border-yellow-500' : ''
-                        }`}
-                        placeholder="e.g.\nDescribe the job."
-                        value={formData.about}
-                        onChange={handleChange}
-                        required
-                      ></textarea>
-                      <div className={`text-sm mt-1 text-right ${
-                        aboutWordCount === WORD_LIMIT ? 'text-yellow-600' : 'text-gray-500'
-                      }`}>
-                        {aboutWordCount}/{WORD_LIMIT} words
-                      </div>
-                    </div>
+              <div className="space-y-6">
+                <div>
+                  <label htmlFor="about" className="block text-gray-700 mb-2">
+                    About*
+                  </label>
+                  <textarea
+                    id="about"
+                    name="about"
+                    rows={4}
+                    className={`form-control focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-all ${
+                      aboutWordCount === WORD_LIMIT ? 'border-yellow-500' : ''
+                    }`}
+                    placeholder="Enter job description in bullet points (one per line)"
+                    value={formData.about}
+                    onChange={handleChange}
+                    required
+                  />
+                  <div className="flex justify-between items-center mt-1">
+                    <p className="text-xs text-gray-500">Enter each point on a new line</p>
+                    <p className={`text-sm ${
+                      aboutWordCount === WORD_LIMIT ? 'text-yellow-600' : 'text-gray-500'
+                    }`}>
+                      {aboutWordCount}/{WORD_LIMIT} words
+                    </p>
                   </div>
                 </div>
-                
-                <div className="border-b border-gray-200 pb-6">
-                  <h2 className="text-xl font-semibold mb-4">More details*</h2>
-                  <div className="space-y-2">
-                    <p className="text-sm text-gray-600">Enter more details about the job, each on a new line. These will be formatted as bullet points.</p>
-                    <div className="relative">
-                      <textarea
-                        id="moreDetails"
-                        name="moreDetails"
-                        rows="5"
-                        className={`form-control focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-all w-full ${
-                          moreDetailsWordCount === WORD_LIMIT ? 'border-yellow-500' : ''
-                        }`}
-                        placeholder="e.g. List any extra details about the job."
-                        value={formData.moreDetails}
-                        onChange={handleChange}
-                        required
-                      ></textarea>
-                      <div className={`text-sm mt-1 text-right ${
-                        moreDetailsWordCount === WORD_LIMIT ? 'text-yellow-600' : 'text-gray-500'
-                      }`}>
-                        {moreDetailsWordCount}/{WORD_LIMIT} words
-                      </div>
-                    </div>
+
+                <div>
+                  <label htmlFor="moreDetails" className="block text-gray-700 mb-2">
+                    Additional Details
+                  </label>
+                  <textarea
+                    id="moreDetails"
+                    name="moreDetails"
+                    rows={4}
+                    className={`form-control focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-all ${
+                      moreDetailsWordCount === WORD_LIMIT ? 'border-yellow-500' : ''
+                    }`}
+                    placeholder="Enter any additional details in bullet points (one per line)"
+                    value={formData.moreDetails}
+                    onChange={handleChange}
+                  />
+                  <div className="flex justify-between items-center mt-1">
+                    <p className="text-xs text-gray-500">Enter each point on a new line</p>
+                    <p className={`text-sm ${
+                      moreDetailsWordCount === WORD_LIMIT ? 'text-yellow-600' : 'text-gray-500'
+                    }`}>
+                      {moreDetailsWordCount}/{WORD_LIMIT} words
+                    </p>
                   </div>
                 </div>
-              </>
+              </div>
             )}
           </div>
-          
+
           <div className="border-b border-gray-200 pb-6">
             <h2 className="text-xl font-semibold mb-4">Sender Email*</h2>
             <div className="space-y-2">
@@ -407,7 +418,7 @@ export default function JobTemplate() {
               )}
             </div>
           </div>
-          
+
           <div className="flex justify-end space-x-4">
             <button
               type="button"
@@ -417,15 +428,14 @@ export default function JobTemplate() {
               Cancel
             </button>
             <button
-              type="button"
+              type="submit"
               className="btn btn-primary transition-all hover:scale-105 hover:shadow-md"
-              onClick={handleSubmit}
               disabled={dateError}
             >
               Next
             </button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );

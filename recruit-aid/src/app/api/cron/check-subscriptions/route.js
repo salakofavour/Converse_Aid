@@ -1,5 +1,6 @@
+import { fetchWithCSRF } from '@/lib/fetchWithCSRF';
 import { sendSubscriptionNotification } from '@/lib/notifications';
-import { createServerClient } from '@supabase/ssr';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
@@ -23,7 +24,7 @@ async function cleanupExcessJobs(supabase, userId) {
   for (const job of jobsToDelete) {
     if (job.namespace_id) {
       try {
-        await fetch('/api/pinecone/delete-namespace', {
+        await fetchWithCSRF('/api/pinecone/delete-namespace', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -53,28 +54,7 @@ export async function GET(request) {
     }
 
     const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      {
-        cookies: {
-          async getAll() {
-            return cookieStore.getAll();
-          },
-          async setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // The `setAll` method was called from a Server Component.
-              // This can be ignored if you have middleware refreshing
-              // user sessions.
-            }
-          },
-        },
-      }
-    );
+    const supabase = await createSupabaseServerClient();
 
     const now = new Date();
 

@@ -1,9 +1,9 @@
 import { validateCSRFToken } from '@/lib/csrf';
-import { cancelSubscription } from '@/lib/subscription';
-import { createServerClient } from '@supabase/ssr';
+import { getSubscription } from '@/lib/subscription';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { NextResponse } from 'next/server';
 
-export async function POST(request) {
+export async function GET(request) {
   try {
     // Validate CSRF token
     const csrfError = await validateCSRFToken(request);
@@ -14,22 +14,7 @@ export async function POST(request) {
       }, { status: 403 });
     }
 
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              request.cookies.set(name, value, options)
-            );
-          },
-        },
-      }
-    );
+    const supabase = await createSupabaseServerClient();
 
     const {
       data: { user },
@@ -43,7 +28,7 @@ export async function POST(request) {
       );
     }
 
-    const result = await cancelSubscription(user.id);
+    const result = await getSubscription(user.id);
 
     if (!result.success) {
       return NextResponse.json(
@@ -52,7 +37,10 @@ export async function POST(request) {
       );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      subscription: result.subscription
+    });
   } catch (error) {
     console.error('Error:', error);
     return NextResponse.json(

@@ -1,6 +1,8 @@
 import { sendSubscriptionNotification } from '@/lib/notifications';
 import { stripe } from '@/lib/stripe';
-import { createClient } from '@/lib/supabase';
+import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/supabase-server';
+//this file uses the admin/service role key created client for the webhook events (webhook to supabse -> server-to-server)
+//only creating the subscription for first time requires webhook.
 
 /**
  * Valid subscription statuses
@@ -22,13 +24,21 @@ export const SUBSCRIPTION_STATUS = {
  */
 export async function getSubscription(userId) {
   try {
-    const supabase = createClient();
+    const supabase = await createSupabaseServerClient();
 
     const { data: subscription, error } = await supabase
       .from('subscriptions')
       .select('*')
       .eq('user_id', userId)
       .single();
+
+    // If no subscription found, return null as a valid state
+    if (error?.code === 'PGRST116') {
+      return {
+        success: true,
+        subscription: null
+      };
+    }
 
     if (error) throw new Error('Failed to get subscription');
 
@@ -48,11 +58,11 @@ export async function getSubscription(userId) {
  * Creates a new subscription with trial period
  * @param {string} userId - The user's ID
  * @param {string} email - The user's email
- * @returns {Promise<{ success: boolean, subscription?: Object, checkoutUrl?: string, error?: string }>}
+ * @returns {Promise<{ success: boolean, checkoutUrl?: string, error?: string }>}
  */
 export async function createSubscription(userId, email) {
   try {
-    const supabase = createClient();
+    const supabase = await createSupabaseServerClient();
 
     // Check for existing subscription
     const { data: existingSubscription } = await supabase
@@ -74,38 +84,7 @@ export async function createSubscription(userId, email) {
         metadata: { supabase_user_id: userId }
       });
       stripeCustomerId = customer.id;
-    }
-
-    // Create subscription with trial
-    const subscription = await stripe.subscriptions.create({
-      customer: stripeCustomerId,
-      items: [{ price: process.env.STRIPE_PRICE_ID }],
-      trial_period_days: 14,
-      metadata: { supabase_user_id: userId }
-    });
-
-    // Create or update subscription record
-    const now = new Date();
-    const trialEnd = new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000));
-    const subscriptionData = {
-      user_id: userId,
-      stripe_customer_id: stripeCustomerId,
-      stripe_subscription_id: subscription.id,
-      status: SUBSCRIPTION_STATUS.TRIALING,
-      trial_start: now.toISOString(),
-      trial_end: trialEnd.toISOString(),
-      subscription_end: new Date(subscription.current_period_end * 1000).toISOString()
-    };
-
-    if (existingSubscription) {
-      await supabase
-        .from('subscriptions')
-        .update(subscriptionData)
-        .eq('user_id', userId);
-    } else {
-      await supabase
-        .from('subscriptions')
-        .insert(subscriptionData);
+      console.log("new stripe customer created");
     }
 
     // Create checkout session for payment method setup
@@ -113,17 +92,17 @@ export async function createSubscription(userId, email) {
       customer: stripeCustomerId,
       mode: 'setup',
       payment_method_types: ['card'],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings/subscription?setup_success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings/subscription?setup_canceled=true`,
+      success_url: `${process.env.PUBLIC_APP_URL}/dashboard/settings/subscription?setup_success=true`,
+      cancel_url: `${process.env.PUBLIC_APP_URL}/dashboard/settings/subscription?setup_canceled=true`,
+      metadata: {
+        supabase_user_id: userId,
+        setup_intent: 'subscription_setup',
+        has_previous_subscription: existingSubscription ? 'true' : 'false'
+      }
     });
 
     return {
       success: true,
-      subscription: {
-        id: subscription.id,
-        status: SUBSCRIPTION_STATUS.TRIALING,
-        trial_end: trialEnd.toISOString()
-      },
       checkoutUrl: session.url
     };
   } catch (error) {
@@ -134,44 +113,6 @@ export async function createSubscription(userId, email) {
   }
 }
 
-/**
- * Cancels a user's subscription
- * @param {string} userId - The user's ID
- * @returns {Promise<{ success: boolean, error?: string }>}
- */
-export async function cancelSubscription(userId) {
-  try {
-    const supabase = createClient();
-
-    const { data: subscription } = await supabase
-      .from('subscriptions')
-      .select('stripe_subscription_id')
-      .eq('user_id', userId)
-      .single();
-
-    if (!subscription?.stripe_subscription_id) {
-      throw new Error('No active subscription found');
-    }
-
-    // Cancel the subscription at period end
-    await stripe.subscriptions.update(subscription.stripe_subscription_id, {
-      cancel_at_period_end: true
-    });
-
-    // Update subscription status
-    await supabase
-      .from('subscriptions')
-      .update({ status: SUBSCRIPTION_STATUS.CANCELED })
-      .eq('stripe_subscription_id', subscription.stripe_subscription_id);
-
-    return { success: true };
-  } catch (error) {
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}
 
 /**
  * Creates a Stripe billing portal session
@@ -180,8 +121,8 @@ export async function cancelSubscription(userId) {
  */
 export async function createBillingPortalSession(userId) {
   try {
-    const supabase = createClient();
-
+    const supabase = await createSupabaseServerClient();
+    console.log("about to get session URL")
     const { data: subscription } = await supabase
       .from('subscriptions')
       .select('stripe_customer_id')
@@ -194,9 +135,9 @@ export async function createBillingPortalSession(userId) {
 
     const session = await stripe.billingPortal.sessions.create({
       customer: subscription.stripe_customer_id,
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings/subscription`
+      return_url: `${process.env.PUBLIC_APP_URL}/dashboard/settings/subscription`
     });
-
+    console.log("session URL created")
     return {
       success: true,
       url: session.url
@@ -216,9 +157,57 @@ export async function createBillingPortalSession(userId) {
  */
 export async function handleWebhookEvent(event) {
   try {
-    const supabase = createClient();
+    const supabase = createSupabaseAdminClient();
+
+    console.log('Received Stripe webhook event:', event.type);
 
     switch (event.type) {
+      case 'checkout.session.completed':
+        const session = event.data.object;
+        // Only process if this is a subscription setup
+        if (session.metadata?.setup_intent === 'subscription_setup') {
+          const userId = session.metadata.supabase_user_id;
+          const hasHadPreviousSubscription = session.metadata.has_previous_subscription === 'true';
+          
+          // Create subscription with trial only for new users
+          const subscription = await stripe.subscriptions.create({
+            customer: session.customer,
+            items: [{ price: process.env.STRIPE_PRICE_ID }],
+            trial_period_days: hasHadPreviousSubscription ? 0 : 14,
+            metadata: { supabase_user_id: userId }
+          });
+
+          // Create or update subscription record
+          const now = new Date();
+          const trialEnd = hasHadPreviousSubscription ? 
+            now : 
+            new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000));
+          
+          const subscriptionData = {
+            user_id: userId,
+            stripe_customer_id: session.customer,
+            stripe_subscription_id: subscription.id,
+            status: hasHadPreviousSubscription ? 
+              SUBSCRIPTION_STATUS.ACTIVE : 
+              SUBSCRIPTION_STATUS.TRIALING,
+            trial_start: hasHadPreviousSubscription ? null : now.toISOString(),
+            trial_end: hasHadPreviousSubscription ? null : trialEnd.toISOString(),
+            subscription_end: new Date(subscription.current_period_end * 1000).toISOString()
+          };
+
+          // Use upsert to create or update the subscription record
+          await supabase
+            .from('subscriptions')
+            .upsert(subscriptionData, {
+              onConflict: 'user_id',
+              ignoreDuplicates: false
+            });
+
+          if (error) throw error;
+
+        }
+        break;
+
       case 'customer.subscription.updated':
         const subscription = event.data.object;
         await supabase
@@ -258,12 +247,12 @@ export async function handleWebhookEvent(event) {
 }
 
 /**
- * Checks and updates subscription statuses
+ * Checks and updates subscription statuses (cron scheduled)
  * @returns {Promise<{ success: boolean, error?: string }>}
  */
 export async function checkSubscriptions() {
   try {
-    const supabase = createClient();
+    const supabase = await createSupabaseServerClient();
     const now = new Date();
 
     // Get all active and trial subscriptions with profiles

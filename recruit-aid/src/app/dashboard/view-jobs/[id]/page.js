@@ -1,6 +1,6 @@
 'use client';
 
-import { getJobById, getMembers } from '@/lib/supabase';
+import { fetchWithCSRF } from '@/lib/fetchWithCSRF';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -15,70 +15,45 @@ export default function JobDetail() {
   const [members, setMembers] = useState([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
   
-  // Load job data from Supabase
+  // Load job and members data
   useEffect(() => {
-    async function loadJob() {
-      if (!params.id) {
-        setError('Job ID is required');
-        setIsLoading(false);
-        return;
-      }
-      
+    async function loadData() {
       try {
         setIsLoading(true);
-        const { job: jobData, error: jobError } = await getJobById(params.id);
         
-        if (jobError) {
-          throw new Error(jobError.message);
+        // Get job details from API
+        const jobResponse = await fetchWithCSRF(`/api/jobs/${params.id}`);
+        if (!jobResponse.ok) {
+          throw new Error('Failed to fetch job');
         }
-        
-        if (!jobData) {
-          throw new Error('Job not found');
-        }
-        
+        const { job: jobData } = await jobResponse.json();
         setJob(jobData);
-      } catch (err) {
-        console.error('Error loading job:', err);
-        setError(err.message || 'Failed to load job details');
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    
-    loadJob();
-  }, [params.id]);
-  
-  // Load members
-  useEffect(() => {
-    async function loadMembers() {
-      if (!params.id) return;
-      
-      try {
-        setIsLoadingMembers(true);
-        const { members: membersData, error } = await getMembers(params.id);
-        
-        if (error) {
-          console.error('Error loading members:', error);
-        } else {
+
+        // Get members from API
+        const membersResponse = await fetchWithCSRF(`/api/members?jobId=${params.id}`);
+        if (membersResponse.ok) {
+          const { members: membersData } = await membersResponse.json();
           setMembers(membersData || []);
         }
       } catch (err) {
-        console.error('Error loading members:', err);
+        console.error('Error loading job details:', err);
+        setError(err.message || 'Failed to load job details');
       } finally {
+        setIsLoading(false);
         setIsLoadingMembers(false);
       }
     }
-    
-    loadMembers();
+
+    loadData();
   }, [params.id]);
-  
+
   // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     const options = { year: 'numeric', month: 'long', day: 'numeric' };
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
-  
+
   // Convert text to bullet points
   const formatBulletPoints = (text) => {
     if (!text) return [];
@@ -87,7 +62,7 @@ export default function JobDetail() {
 
   // Check if job can be edited (not closed)
   const canEdit = job && (new Date() <= new Date(job.job_end_date));
-  
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -98,7 +73,7 @@ export default function JobDetail() {
       </div>
     );
   }
-  
+
   if (error) {
     return (
       <div className="space-y-6">
@@ -123,7 +98,7 @@ export default function JobDetail() {
       </div>
     );
   }
-  
+
   if (!job) {
     return (
       <div className="space-y-6">
@@ -145,7 +120,7 @@ export default function JobDetail() {
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -204,56 +179,53 @@ export default function JobDetail() {
               </div>
             )}
           </div>
-          </div>
-          </div>
+        </div>
+      </div>
 
-
-        {/* If file is uploaded, show file icon & name, otherwise show about & more details */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+      {/* Knowledge Base Section */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
         <h2 className="text-lg font-semibold mb-4">Knowledge Base</h2>
 
-          {job.file_uploaded ? (
-            <div className="flex flex-col items-center justify-center py-6">
-              <div className="flex items-center space-x-2">
-                <FaFileAlt className="w-6 h-6 text-primary" />
-                <span
-                  className="text-gray-700 max-w-[200px] truncate"
-                  title={job.original_filename}
-                >
-                  {job.original_filename}
-                </span>
-              </div>
+        {job.file_uploaded ? (
+          <div className="flex flex-col items-center justify-center py-6">
+            <div className="flex items-center space-x-2">
+              <FaFileAlt className="w-6 h-6 text-primary" />
+              <span
+                className="text-gray-700 max-w-[200px] truncate"
+                title={job.original_filename}
+              >
+                {job.original_filename}
+              </span>
             </div>
-            ) : (
-            // About and More Details sections
-            <>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">About</h3>
-                <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
-                  {formatBulletPoints(job.About).slice(0, 3).map((point, index) => (
-                    <li key={index}>{point}</li>
-                  ))}
-                  {formatBulletPoints(job.About).length > 3 && (
-                    <li className="text-primary">+ {formatBulletPoints(job.About).length - 3} more</li>
-                  )}
-                </ul>
-              </div>
-            
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">More Details</h3>
-                <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
-                  {formatBulletPoints(job.MoreDetails).slice(0, 3).map((point, index) => (
-                    <li key={index}>{point}</li>
-                  ))}
-                  {formatBulletPoints(job.MoreDetails).length > 3 && (
-                    <li className="text-primary">+ {formatBulletPoints(job.MoreDetails).length - 3} more</li>
-                  )}
-                </ul>
-              </div>
-              </>
-          )}
-
-        </div>
+          </div>
+        ) : (
+          <>
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-2">About</h3>
+              <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
+                {formatBulletPoints(job.about).slice(0, 3).map((point, index) => (
+                  <li key={index}>{point}</li>
+                ))}
+                {formatBulletPoints(job.about).length > 3 && (
+                  <li className="text-primary">+ {formatBulletPoints(job.about).length - 3} more</li>
+                )}
+              </ul>
+            </div>
+          
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-2">More Details</h3>
+              <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
+                {formatBulletPoints(job.more_details).slice(0, 3).map((point, index) => (
+                  <li key={index}>{point}</li>
+                ))}
+                {formatBulletPoints(job.more_details).length > 3 && (
+                  <li className="text-primary">+ {formatBulletPoints(job.more_details).length - 3} more</li>
+                )}
+              </ul>
+            </div>
+          </>
+        )}
+      </div>
       
       {/* Members Table */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
@@ -278,9 +250,6 @@ export default function JobDetail() {
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Member Email
                   </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -295,11 +264,6 @@ export default function JobDetail() {
                       <div className="text-sm text-gray-500">
                         {member.name_email.email}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button className="text-primary hover:text-primary-dark transition-colors">
-                        View Details
-                      </button>
                     </td>
                   </tr>
                 ))}
