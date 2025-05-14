@@ -42,6 +42,12 @@ export async function PUT(request) {
         { status: 400 }
       );
     }
+    //when the user has been updated, also then update the email that will show in profile
+    const {error: updateProfileError} = await supabase
+    .from('profiles')
+    .update({email: newEmail})
+    .eq('id', user.id);
+
 
     return NextResponse.json({
       success: true,

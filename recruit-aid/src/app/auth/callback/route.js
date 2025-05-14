@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 export async function GET(request) {
+  console.log('Callback route called');
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
 

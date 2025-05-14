@@ -24,6 +24,10 @@ export async function refreshAccessToken(email, refresh_token) {
     const { credentials } = await oauth2Client.refreshAccessToken();
     const { access_token, expiry_date } = credentials;
 
+    //access_token  expiry time from this is in millisecond(access will be refreshed via the web_app to use & not checked against expiry date as it is only occasional and must not fail
+    //but via the agent more frequently & since the agent deals with seconds I will convert the result of this to seconds before saving it in db
+    const expiry_time_seconds = Math.floor(expiry_date / 1000);
+
     // Update the token in the database
     const supabase = await createSupabaseServerClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -42,7 +46,7 @@ export async function refreshAccessToken(email, refresh_token) {
         ? {
             ...sender,
             access_token,
-            access_expires_in: expiry_date
+            access_expires_in: expiry_time_seconds
           }
         : sender
     );
@@ -54,6 +58,7 @@ export async function refreshAccessToken(email, refresh_token) {
 
     if (updateError) throw new Error('Failed to update profile');
 
+    //since I refresh the access_token before i send a message when on web, the espiry time does not need to be converted back to milliseconds to use here
     return {
       success: true,
       access_token

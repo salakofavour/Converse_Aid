@@ -66,36 +66,11 @@ async function breakText(content) {
     }
   );
 
-  const k = getDynamicClusterCount(sentences);
-  const points = embeddings.data.map(e => e.values);
-  const clusters = await kmeans(points, k);
-
-  // Group sentences and their embeddings by cluster
-  const semanticChunks = new Array(k).fill(null).map(() => []);
-  const semanticVectors = new Array(k).fill(null).map(() => []);
-
-  clusters.forEach((cluster, idx) => {
-    semanticChunks[cluster].push(sentences[idx]);
-    semanticVectors[cluster].push(points[idx]);
-  });
-
-  // For each chunk, join sentences and average their vectors
-  const chunks = semanticChunks
-    .map((cluster, i) => {
-      if (cluster.length === 0) return null;
-      // Average the vectors for this chunk
-      const vectors = semanticVectors[i];
-      const avgVector = vectors[0].map((_, dim) =>
-        vectors.reduce((sum, vec) => sum + vec[dim], 0) / vectors.length
-      );
-      return {
-        text: cluster.join('. '),
-        values: avgVector
-      };
-    })
-    .filter(Boolean);
-
-  return chunks;
+  // Return individual sentence chunks with their vectors
+  return embeddings.data.map((embedding, index) => ({
+    text: sentences[index],
+    values: embedding.values
+  }));
 }
 
 // Simple k-means implementation

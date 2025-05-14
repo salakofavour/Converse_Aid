@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 export async function POST(request) {
   try {
     const { email } = await request.json();
+    console.log('PUBLIC_APP_URL:', process.env.PUBLIC_APP_URL);
 
     if (!email) {
       return NextResponse.json(
@@ -13,13 +14,14 @@ export async function POST(request) {
     }
 
     const supabase = await createSupabaseServerClient();
+    console.log("got here")
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
+        emailRedirectTo: `${process.env.PUBLIC_APP_URL}/auth/callback`
       }
     });
-
+    console.log("got here 2")
     if (error) {
       console.error('Error signing in:', error);
       return NextResponse.json(

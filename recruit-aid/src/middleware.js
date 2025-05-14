@@ -44,13 +44,14 @@ export async function middleware(request) {
     }
   }
 
-  // If user is not signed in and the current path is not / or /signin or /signup
+  // If user is not signed in and the current path is not / or /signin or /signup (has code and uses /api/auth -> i need both these check to pass sign in & up, I also need the code one to pass the gmail response of adding a sender email)
   // redirect the user to /
   if (!user && 
-      !request.nextUrl.pathname.startsWith('/auth') && 
+      !request.nextUrl.pathname.includes('/api/auth') && 
+      !request.nextUrl.searchParams.has('code') && 
       request.nextUrl.pathname !== '/' && 
       request.nextUrl.pathname !== '/signin' && 
-      request.nextUrl.pathname !== '/signup') {
+      request.nextUrl.pathname !== '/signup'){
     return NextResponse.redirect(new URL('/', request.url));
   }
 

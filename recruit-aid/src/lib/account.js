@@ -2,7 +2,7 @@
 
 import { deletePineconeNamespaceDirect } from '@/lib/pinecone-ops';
 import { stripe } from '@/lib/stripe';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/supabase-server';
 import { fetchWithCSRF } from './fetchWithCSRF';
 
 /**
@@ -123,10 +123,7 @@ export async function deleteAccount(userId) {
     }
 
     // Delete the user account using admin client
-    const supabaseAdmin = await createSupabaseServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_KEY
-    );
+    const supabaseAdmin = await createSupabaseAdminClient();
     
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
     if (deleteError) throw new Error(deleteError.message);

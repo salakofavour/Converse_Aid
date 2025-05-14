@@ -67,7 +67,7 @@ class VectorSearchService:
     
     @retry_with_backoff()
     def search(self, index_name: str, vector: List[float], 
-              namespace: str, top_k: int = 3, 
+              namespace: str, top_k: int = 5, 
               score_threshold: float = 0.8) -> Dict[str, Any]:
         """
         Search for similar vectors in Pinecone.

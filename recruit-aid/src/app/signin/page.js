@@ -1,6 +1,5 @@
 'use client';
 
-import { fetchWithCSRF } from '@/lib/fetchWithCSRF';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -15,7 +14,7 @@ export default function SignIn() {
     setMessage({ type: '', text: '' });
 
     try {
-      const response = await fetchWithCSRF('/api/auth/signin', {
+      const response = await fetch('/api/auth/signin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
