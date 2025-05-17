@@ -58,6 +58,7 @@ export async function refreshAccessToken(email, refresh_token) {
 
     if (updateError) throw new Error('Failed to update profile');
 
+    console.log("sender details changed");
     //since I refresh the access_token before i send a message when on web, the espiry time does not need to be converted back to milliseconds to use here
     return {
       success: true,
@@ -373,6 +374,8 @@ export async function handleGmailAuthCallback(code, state) {
     if (emailExists) {
       throw new Error('Email already exists');
     }
+    //milliseconds to second - access-token time
+    const access_expires = Math.floor(tokens.expiry_date / 1000);
 
     const { error: updateError } = await supabase
       .from('profiles')
@@ -381,7 +384,7 @@ export async function handleGmailAuthCallback(code, state) {
           email, 
           refresh_token: tokens.refresh_token,
           access_token: tokens.access_token,
-          access_expires_in: tokens.expiry_date,
+          access_expires_in: access_expires,
           refresh_added_at: new Date().toISOString() 
         }]
       })

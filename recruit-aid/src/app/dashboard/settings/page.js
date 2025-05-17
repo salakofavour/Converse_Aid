@@ -185,7 +185,7 @@ export default function Settings() {
             setSenderEmails(data.profile.sender);
           } else {
             console.log('No profile data in response, fetching fresh profile...');
-            // Fallback to refreshing profile data
+            // Fallback to refreshing profile data (cause if no error, it means new profile already saved to db, just not passed)
             const profileResponse = await fetchWithCSRF('/api/profile');
             if (profileResponse.ok) {
               const { profile } = await profileResponse.json();

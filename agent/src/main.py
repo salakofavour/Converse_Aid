@@ -49,10 +49,10 @@ class EmailAutomationApp:
         Initialize the email automation application.
         
         Args:
-            job_id: The job ID to process (optional, defaults to config)
+            job_id: The job ID to process (compulsory)
         """
         # Set up the job ID
-        self.job_id = job_id or os.environ.get("DEFAULT_JOB_ID")
+        self.job_id = job_id
         self.member_id = None  # Will be set during processing of each member
         
         # # Set up LLM and graph
