@@ -6,9 +6,9 @@ from src.utils import retry_with_backoff
 from src.database import db
 # from src.utils import util
 # from src.email_service import email_service
-from dotenv import load_dotenv
-
-load_dotenv()
+# from dotenv import load_dotenv
+import src.config as config
+# load_dotenv()
 
 class AuthService:
     """

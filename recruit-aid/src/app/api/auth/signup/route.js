@@ -44,8 +44,11 @@ export async function POST(request) {
     if (profileError) {
       console.error('Error creating initial profile:', profileError);
       // Don't return error here as the user was created successfully
-      // The profile can be created later if needed
+      // The profile can be created manually by the user
     }
+
+    // Send welcome email
+    await sendWelcomeEmail(email); //No checking error here because it's not a critical error & regardless of sending or not, the user will be created
 
     return NextResponse.json({ 
       success: true,

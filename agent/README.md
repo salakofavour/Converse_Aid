@@ -29,7 +29,7 @@ The system is organized into modular components:
 - Supabase account and project
 - Pinecone account and index
 - Gmail API credentials
-- Groq API key
+- Cohere API key
 
 ### Setup
 
@@ -40,7 +40,7 @@ The system is organized into modular components:
    ```
 3. Create a `.env` file with the required credentials:
    ```
-   GROQ_API_KEY=your_groq_key
+   COHERE_API_KEY=your_cohere_key
    PINECONE_API_KEY=your_pinecone_key
    SUPABASE_URL=your_supabase_url
    SUPABASE_SERVICE_ROLE_KEY=your_SUPABASE_SERVICE_ROLE_KEY
@@ -58,7 +58,7 @@ python run.py [--job-id JOB_ID]
 ```
 
 Options:
-- `--job-id`: Specify a job ID to process (optional)
+- `--job-id`: Specify a job ID to process
 
 ### Scheduling with Cron
 

@@ -1,13 +1,12 @@
 import os
 import json
 import time
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 from src.database import db
 from src.auth import auth_service
 import src.config as config
-
 # Load environment variables
-load_dotenv()
+# load_dotenv()
 
 def main():
     """Test the token update functionality."""

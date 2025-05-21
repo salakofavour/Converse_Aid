@@ -7,6 +7,8 @@ When you're ready, start your application by running:
             or
 
 "docker run -e JOB_ID=123 your-image"
+            or
+docker compose run --rm server python run.py --job-id 123
 
 #to build When I make changes to the source code itself, run
 `docker compose up --build`.

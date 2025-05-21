@@ -3,7 +3,7 @@ import time
 import asyncio
 from typing import Dict, Any, Optional, List, Annotated
 from langchain_core.prompts import PromptTemplate
-from langchain_groq import ChatGroq
+from langchain_cohere import ChatCohere
 # from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
@@ -20,8 +20,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Initialize memory saver for the graph
-# memory = MemorySaver()
+
 
 class State(TypedDict):
     """State object used in the graph."""
@@ -29,13 +28,7 @@ class State(TypedDict):
     messages: List[Dict[str, Any]]
 
 
-# # Function to add messages to the state
-# def add_messages_to_state(state: State, messages: List[Dict[str, Any]]) -> State:
-#     """Add messages to the state."""
-#     if 'messages' not in state:
-#         state['messages'] = []
-#     state['messages'].extend(messages)
-#     return state
+
 
 class EmailAutomationApp:
     """
@@ -55,10 +48,8 @@ class EmailAutomationApp:
         self.job_id = job_id
         self.member_id = None  # Will be set during processing of each member
         
-        # # Set up LLM and graph
-        # self.graph = None
-        # self.setup_graph()
-        self.graph = None  # Will be set up for each member in run()
+
+        self.graph = None  # graph will be set up for each member in run()
     
     #normal function, not as a tool. tool = too much hassle
     def start_message(self) -> str:
@@ -104,7 +95,7 @@ class EmailAutomationApp:
             The updated state with the new message
         """
         try:
-            llm = ChatGroq(
+            llm = ChatCohere(
                 model=os.environ.get("LLM_MODEL"), 
                 temperature=os.environ.get("LLM_TEMPERATURE"), 
                 max_tokens=os.environ.get("LLM_MAX_TOKENS"), 
@@ -113,6 +104,8 @@ class EmailAutomationApp:
 
             # Get member details
             member = db.get_member_details(self.member_id)
+            #get job details
+            job = db.get_job_details(self.job_id)
             
             # Search for relevant information using the last email's body
             email_body = member.get("body", "")
@@ -120,10 +113,10 @@ class EmailAutomationApp:
             receiver = f"hi {member['name_email']['name']}"
 
             email_context_prompt = PromptTemplate.from_template(
-                """You are a helpful assistant that is given a conversation thread. 
-                    Your job is to understand the context of the last response not starting with {receiver} in the conversation and extract any question from it in a single sentence.
+                """Act as a helpful assistant.
+                    Your job is to understand the context of the last response not starting with {receiver} in the "conversation-thread" and extract any question from it in a single sentence.
                     Understand that the question is going to be answered via a semantic search, so it needs to semantically represent what the last response not starting with {receiver} is about.
-                    Conversation Thread: {email_history}\n
+                    "conversation-thread": {email_history}\n
                    """
             )
             email_context = llm.invoke(email_context_prompt.invoke({"email_history": email_body, "receiver": receiver}))
@@ -138,7 +131,7 @@ class EmailAutomationApp:
                 context = "Your question is not related to this conversation. Please refrain from asking questions that are not related to this conversation."
                 #send a notification email to the user informing the user that an member has asked a question not in KnowledgeBase
                 
-                message = "member - {member_email} asked a question that is  either not related to the job in question or not in the KnowledgeBase. We continued the conversation but you can check your email with {member_email} and subject - {subject_title} to see the question. It is the message before the member is informed not to ask questions that are not related to the job in question."
+                message = f"member - {member['name_email']['name']} asked a question that is either not related to the job - {job['title']} or not in the KnowledgeBase. We continued the conversation but you can check your email with {member['name_email']['email']} and subject - {member['subject']} to see the question. It is the message before the member is informed not to ask questions that are not related to the job in question."
                 email_service.send_user_notification_email(message, self.member_id, self.job_id)
             
             print("got here in create_message, mid create message", search_results)
@@ -146,7 +139,7 @@ class EmailAutomationApp:
             # Generate response using template
             
             prompt = PromptTemplate.from_template(
-                """You are a professional and friendly email assistant. Your job is to reply to emails using only the information provided in the "Context" below, which is retrieved from the knowledge base as the. Do not use any other information to answer questions.
+                """Act as a professional and friendly email assistant. I need you to reply to emails using only the information provided in the "Context" below, which is retrieved from the knowledge base. Do not use any other information to answer questions.
 
                 Instructions:
                 - Use the "Conversation History" only to match the tone and flow of the conversation, not for factual content.
@@ -187,7 +180,6 @@ class EmailAutomationApp:
                 }
             
         except Exception as e:
-            # return{"content": f"Failed to create message: {str(e)}", "sequence_complete": True}
             raise
     
     def reply_thread(self, state: State) -> Dict[str, Any]:
@@ -203,20 +195,6 @@ class EmailAutomationApp:
             #get email response kept in state gotten from create_message
             new_message = f"Hi {member['name_email']['name']}, \n\n {state['email_response']}" #here i will figure out how to add footers.
             
-            # # Check if response exists and handle None case
-            # if not new_message:
-            #     print(f"No response found for member {self.member_id}, retrying fetch...")
-            #     # Could be a timing issue, wait briefly and try once more
-            #     time.sleep(1)  # Add import time if not already imported
-            #     member = db.get_member_details(self.member_id)
-            #     new_message = member["response"]
-            #     if not new_message:
-            #         return {
-            #             "content": "Cannot send reply: no response message found in database", 
-            #             "sequence_complete": True,
-            #             "tool": None,
-            #             "stop": True
-            #         }
             print("got here in reply_thread", member)
             # Prepare reply parameters
             reply_params = {
@@ -232,7 +210,7 @@ class EmailAutomationApp:
             response = email_service.send_reply(self.job_id, self.member_id, reply_params)
             print("response from send_reply: ", response)
             
-            if response: #response.get("status") == "success"
+            if response: 
                 #update member details with the new message_id, thread_id and overall_message_id of the just sent email
                 message_data = email_service.get_message(self.job_id, response.get("id"))
                 print("message_data from recently sent message: ", message_data)
@@ -260,40 +238,22 @@ class EmailAutomationApp:
     def setup_graph(self) -> None:
         """Set up the LangGraph for message processing."""
         try:
-            # memory = MemorySaver()
             # Initialize LLM
-            llm = ChatGroq(
+            llm = ChatCohere(
                 model=os.environ.get("LLM_MODEL"), 
                 temperature=os.environ.get("LLM_TEMPERATURE"), 
                 max_tokens=os.environ.get("LLM_MAX_TOKENS"), 
                 max_retries=3
             )
             
-            # tools = [self.create_message, self.reply_thread]
-            
-            # Define chatbot function with better tool routing
-            # def chatbot(state: State): 
-            #     # use LLM to decide
-            #     llm_with_tools = llm.bind_tools(tools)
-            #     result = llm_with_tools.invoke(state["messages"])
-            #     return {"messages": [result]}
-            
+
             # Build graph
             graph_builder = StateGraph(State)
-            # graph_builder.add_node("chatbot", chatbot)
 
-            # Add tool node
-            # tool_node = ToolNode(tools)
-            # graph_builder.add_node("tools", tool_node)
 
             graph_builder.add_node("create_message", self.create_message)
             graph_builder.add_node("reply_thread", self.reply_thread)
 
-            # Set up proper conditional edges
-            # graph_builder.add_conditional_edges(
-            #     "chatbot",
-            #     tools_condition,
-            # )
 
             # graph_builder.add_edge(START, "chatbot")
             graph_builder.add_edge(START, "create_message")
@@ -316,28 +276,16 @@ class EmailAutomationApp:
         try:
             if not self.graph:
                 raise ValueError("Graph not initialized")
-                
-            # config_data = {
-            #     "configurable": {
-            #         "thread_id": self.member_id # thread_id is an expected value, her it is not the email thread id, its just the name of the parameter
-            #         # "member_id": self.member_id
-            #     }
-            # }
-                
+                 
             # Initialize state with the user message
             initial_state = {
                 "email_body_prompt": "",
                 "messages": [{"role": "user", "content": user_input}]
             }
             
-            # events = self.graph.stream(
-            #     initial_state,
-            #     config_data,
-            #     stream_mode="values",
-            # )
+
             event = self.graph.invoke(
                 initial_state,
-                # config_data,
             )
             if "messages" in event and event["messages"]:
                 for message in event["messages"]:
@@ -345,13 +293,6 @@ class EmailAutomationApp:
                         message.pretty_print()
                     else:
                         print(f"{message.get('role', 'unknown')}: {message.get('content', '')}")
-            # for event in events:
-            #     if "messages" in event and event["messages"]:
-            #         for message in event["messages"]:
-            #             if hasattr(message, "pretty_print"):
-            #                 message.pretty_print()
-            #             else:
-            #                 print(f"{message.get('role', 'unknown')}: {message.get('content', '')}")
             
         except Exception as e:
             raise
@@ -373,8 +314,8 @@ class EmailAutomationApp:
             if not db.get_job_details(self.job_id):
                 util.delete_schedule(self.job_id)
                 return {
-                    "status": "no_action",
-                    "message": "Job does not exist. Functionality to delete schedule will be added in the future."
+                    "status": "Job Agent deleted",
+                    "message": "Job does not exist in database. So, Job Agent schedule has also been deleted."
                 }
             # Validate authentication tokens
             auth_service.validate_token(self.job_id)

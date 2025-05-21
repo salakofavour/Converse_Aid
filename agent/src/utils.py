@@ -4,6 +4,7 @@ import os
 import json
 import requests
 from typing import Callable, Any, Tuple, Type, Union, List
+import src.config as config
 
 
 # Retry mechanism with exponential backoff
@@ -119,8 +120,14 @@ class Util:
 
     @staticmethod
     def delete_schedule(job_id: str) -> None: #this is not yet defined but the idea is to call this function to delete a schedule(when the api is finished it will also be called here)
-        
-        
-        pass
+        headers = {
+            "Content-Type": "application/json",
+            "x-api-key": {os.environ.get('AGENT_API_KEY')}
+        }
+        response = requests.post(os.environ.get('AGENT_DELETE_SCHEDULE'), json={"job_id": job_id}, headers=headers)
+        if response.status_code == 200:
+            return True
+        else:
+            return False
 
 util = Util()

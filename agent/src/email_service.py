@@ -9,9 +9,10 @@ from src.auth import auth_service
 import resend
 import sys
 from src.utils import util
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
+import src.config as config
 
-load_dotenv()
+# load_dotenv()
 
 class EmailService:
     """

@@ -1,4 +1,4 @@
-langchain-groq==0.3.2
+langchain-cohere==0.4.4
 langgraph==0.2.20
 pinecone==6.0.2 
 python-dotenv==1.0.0
