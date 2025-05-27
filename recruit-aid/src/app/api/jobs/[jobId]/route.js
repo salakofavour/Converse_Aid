@@ -57,11 +57,6 @@ export async function PUT(request, { params }) {
   try {
     const { jobId } = await params;
     const jobData = await request.json();
-
-    // Extract file_content before sending to Supabase
-    const file_content = jobData.file_content;
-    delete jobData.file_content;
-
     const supabase = await createSupabaseServerClient();
 
     // Get the current user
@@ -73,9 +68,25 @@ export async function PUT(request, { params }) {
         { status: 401 }
       );
     }
+//2 times job is updated in whole app, one with full data in either create or update job, & one with status update. Both are handled here.
+    if (jobData.status) {
+      const { job, error } = await supabase
+        .from('jobs')
+        .update({ status: jobData.status })
+        .eq('id', jobId)
+        .select()
+        .single();
+  
+      if (error) throw new Error('Error updating job status:', error.message);
+    
+    }else{
+    // Extract file_content before sending to Supabase
+    const file_content = jobData.file_content;
+    delete jobData.file_content;
+
 
     // Update the specific job
-    const { data: job, error: jobError } = await supabase
+    const { job, error: jobError } = await supabase
       .from('jobs')
       .update(jobData)
       .eq('id', jobId)
@@ -116,7 +127,7 @@ export async function PUT(request, { params }) {
     console.error('Error updating Pinecone vectors:', pineconeError);
     // Don't throw the error as the DB update was successful
     }
-
+  }
     return NextResponse.json({ job });
   } catch (error) {
     console.error('Error in job PUT route:', error);
@@ -175,4 +186,4 @@ export async function DELETE(request, { params }) {
       { status: 500 }
     );
   }
-} 
+}

@@ -8,12 +8,13 @@ const headers = {
     'x-api-key': api_key
 }
 
-export async function initiateAgent(jobId) {
+export async function initiateAgent(jobId, interval=15) {
     const {data, error} = await fetch(create_endpoint, {
       method: 'POST',
       headers: headers,
       body: JSON.stringify({
-        "name": jobId.toString()
+        "name": jobId.toString(),
+        "interval": interval
       })
     });
     if (error) {

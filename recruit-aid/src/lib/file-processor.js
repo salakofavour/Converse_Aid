@@ -1,9 +1,9 @@
-import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
 import mammoth from "mammoth";
+
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB in bytes
 const ALLOWED_TYPES = {
-  'application/pdf': 'pdf',
+
   'application/msword': 'doc',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
   'text/plain': 'txt'
@@ -24,7 +24,7 @@ export function validateFile(file) {
   if (!fileType) {
     return { 
       isValid: false, 
-      error: 'Invalid file type. Only PDF, DOC, DOCX, and TXT files are allowed' 
+      error: 'Invalid file type. Only DOC, DOCX, and TXT files are allowed' 
     };
   }
 
@@ -37,19 +37,11 @@ export async function extractTextFromFile(file) {
     const fileType = getFileType(file);
 
     switch (fileType) {
-      case 'pdf':
-        const pdfBytes = await file.arrayBuffer();
-        const loader = new PDFLoader(new Blob([pdfBytes]));
-        const docs = await loader.load();
-        return { 
-          content: docs.map(doc => doc.pageContent).join(' '), 
-          error: null 
-        };
 
       case 'doc':
       case 'docx':
-        const arrayBuffer = await file.arrayBuffer();
-        const result = await mammoth.extractRawText({ arrayBuffer });
+        const docArrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer: docArrayBuffer });
         return { content: result.value, error: null };
 
       case 'txt':
@@ -106,7 +98,6 @@ function getFileType(file) {
   // Fallback: check extension
   const ext = file.name.split('.').pop().toLowerCase();
   switch (ext) {
-    case 'pdf': return 'pdf';
     case 'doc': return 'doc';
     case 'docx': return 'docx';
     case 'txt': return 'txt';

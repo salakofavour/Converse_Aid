@@ -1,3 +1,4 @@
+import { uploadVectors } from '@/lib/pinecone-ops';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { NextResponse } from 'next/server';
 
@@ -91,8 +92,9 @@ export async function POST(request) {
     }
 
     try {
+      console.log("Uploading to Pinecone", job.id);
     const pineconeInfo = {
-        id: jobId,
+        id: job.id,
         content_to_upload
     };
     await uploadVectors(pineconeInfo);
@@ -109,4 +111,4 @@ export async function POST(request) {
       { status: 500 }
     );
   }
-} 
+}

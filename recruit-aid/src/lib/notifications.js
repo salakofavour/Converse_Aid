@@ -45,7 +45,7 @@ export async function sendPaymentFailedNotification(userEmail) {
         <ol>
           <li>Log in to your Converse-Aid account</li>
           <li>Go to Settings > Preferences</li>
-          <li>Click on "Manage Subscription"</li>
+          <li>Click on "View Plans" and then "Manage Subscription"</li>
           <li>Update your payment details</li>
         </ol>
         <p>If you need assistance, please don't hesitate to contact our support team.</p>

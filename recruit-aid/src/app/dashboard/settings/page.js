@@ -310,36 +310,6 @@ export default function Settings() {
     }
   };
 
-  // const handleNotificationSubmit = async (e) => {
-  //   e.preventDefault();
-  //   setIsSubmitting(true);
-  //   setError(null);
-    
-  //   try {
-  //     const response = await fetch('/api/profile', {
-  //       method: 'PUT',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: JSON.stringify({
-  //         ...profileData,
-  //         notificationSettings
-  //       }),
-  //     });
-
-  //     if (!response.ok) {
-  //       const data = await response.json();
-  //       throw new Error(data.error || 'Failed to save notification settings');
-  //     }
-
-  //     toast.success('Notification settings updated successfully');
-  //   } catch (err) {
-  //     console.error('Error saving notification settings:', err);
-  //     setError(err.message || 'Failed to save notification settings. Please try again.');
-  //   } finally {
-  //     setIsSubmitting(false);
-  //   }
-  // };
 
   const handleAddEmail = async () => {
     if (!newEmail) {
@@ -659,125 +629,25 @@ export default function Settings() {
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                      className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isSubmitting ? 'Saving...' : 'Save Changes'}
+                      {isSubmitting ? (
+                        <div className="flex items-center justify-center">
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Saving Changes...
+                        </div>
+                      ) : (
+                        'Save Changes'
+                      )}
                     </button>
                   </div>
                 </form>
               )}
 
-              {/* Notifications Tab
-              {activeTab === 'notifications' && (
-                <form onSubmit={handleNotificationSubmit}>
-                  <div className="space-y-4">
-                    <div className="flex items-start">
-                      <div className="flex items-center h-5">
-                        <input
-                          id="emailNotifications"
-                          name="emailNotifications"
-                          type="checkbox"
-                          checked={notificationSettings.emailNotifications}
-                          onChange={handleNotificationChange}
-                          className="focus:ring-primary h-4 w-4 text-primary border-gray-300 rounded"
-                        />
-                      </div>
-                      <div className="ml-3 text-sm">
-                        <label htmlFor="emailNotifications" className="font-medium text-gray-700">
-                          Email Notifications
-                        </label>
-                        <p className="text-gray-500">Receive email notifications for important updates</p>
-                      </div>
-                    </div>
 
-                    <div className="flex items-start">
-                      <div className="flex items-center h-5">
-                        <input
-                          id="newApplications"
-                          name="newApplications"
-                          type="checkbox"
-                          checked={notificationSettings.newApplications}
-                          onChange={handleNotificationChange}
-                          className="focus:ring-primary h-4 w-4 text-primary border-gray-300 rounded"
-                        />
-                      </div>
-                      <div className="ml-3 text-sm">
-                        <label htmlFor="newApplications" className="font-medium text-gray-700">
-                          New Applications
-                        </label>
-                        <p className="text-gray-500">Get notified when new applications are received</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start">
-                      <div className="flex items-center h-5">
-                        <input
-                          id="interviewReminders"
-                          name="interviewReminders"
-                          type="checkbox"
-                          checked={notificationSettings.interviewReminders}
-                          onChange={handleNotificationChange}
-                          className="focus:ring-primary h-4 w-4 text-primary border-gray-300 rounded"
-                        />
-                      </div>
-                      <div className="ml-3 text-sm">
-                        <label htmlFor="interviewReminders" className="font-medium text-gray-700">
-                          Interview Reminders
-                        </label>
-                        <p className="text-gray-500">Receive reminders for upcoming interviews</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start">
-                      <div className="flex items-center h-5">
-                        <input
-                          id="jobUpdates"
-                          name="jobUpdates"
-                          type="checkbox"
-                          checked={notificationSettings.jobUpdates}
-                          onChange={handleNotificationChange}
-                          className="focus:ring-primary h-4 w-4 text-primary border-gray-300 rounded"
-                        />
-                      </div>
-                      <div className="ml-3 text-sm">
-                        <label htmlFor="jobUpdates" className="font-medium text-gray-700">
-                          Job Updates
-                        </label>
-                        <p className="text-gray-500">Get notified about changes to your job postings</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start">
-                      <div className="flex items-center h-5">
-                        <input
-                          id="weeklyReports"
-                          name="weeklyReports"
-                          type="checkbox"
-                          checked={notificationSettings.weeklyReports}
-                          onChange={handleNotificationChange}
-                          className="focus:ring-primary h-4 w-4 text-primary border-gray-300 rounded"
-                        />
-                      </div>
-                      <div className="ml-3 text-sm">
-                        <label htmlFor="weeklyReports" className="font-medium text-gray-700">
-                          Weekly Reports
-                        </label>
-                        <p className="text-gray-500">Receive weekly summary reports</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-6">
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-                    >
-                      {isSubmitting ? 'Saving...' : 'Save Changes'}
-                    </button>
-                  </div>
-                </form>
-              )} */}
 
               {/* Preferences Tab */}
               {activeTab === 'Preferences' && (
@@ -965,9 +835,19 @@ export default function Settings() {
                     type="button"
                     onClick={handleEmailChange}
                     disabled={isProcessing}
-                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary text-base font-medium text-white hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary sm:col-start-2 sm:text-sm"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary text-base font-medium text-white hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isProcessing ? 'Processing...' : 'Confirm Change'}
+                    {isProcessing ? (
+                      <div className="flex items-center justify-center">
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Processing...
+                      </div>
+                    ) : (
+                      'Confirm Change'
+                    )}
                   </button>
                   <button
                     type="button"
@@ -1041,9 +921,19 @@ export default function Settings() {
                     type="button"
                     onClick={handleDeleteAccount}
                     disabled={isProcessing}
-                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:col-start-2 sm:text-sm"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isProcessing ? 'Processing...' : 'Delete Account'}
+                    {isProcessing ? (
+                      <div className="flex items-center justify-center">
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Processing...
+                      </div>
+                    ) : (
+                      'Delete Account'
+                    )}
                   </button>
                   <button
                     type="button"

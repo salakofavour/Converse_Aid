@@ -311,11 +311,12 @@ class EmailAutomationApp:
         """
         try:
             # The first step will be to check if the job_id exists in the db, if it does not, return a message saying the job does not exist & delete the schedule
-            if not db.get_job_details(self.job_id):
+            job = db.get_job_details(self.job_id)
+            if not job or job["status"].lower() == "closed":
                 util.delete_schedule(self.job_id)
                 return {
                     "status": "Job Agent deleted",
-                    "message": "Job does not exist in database. So, Job Agent schedule has also been deleted."
+                    "message": "Job does not exist in database or is closed. So, Job Agent schedule has also been deleted."
                 }
             # Validate authentication tokens
             auth_service.validate_token(self.job_id)

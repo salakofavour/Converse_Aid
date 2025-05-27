@@ -82,7 +82,7 @@ export async function updateAgentState(jobId, action) {
     // Get job to verify ownership and current state
     const { data: job, error: jobError } = await supabase
       .from('jobs')
-      .select('user_id, agent_state, status')
+      .select('user_id, agent_state, status, interval')
       .eq('id', jobId)
       .single();
 
@@ -119,7 +119,7 @@ export async function updateAgentState(jobId, action) {
     if (actionConfig.state === AGENT_STATES.RUNNING) {
       console.log("starting or resuming agent");
       await endAgent(jobId);
-      await initiateAgent(jobId);
+      await initiateAgent(jobId, job.interval);
     } else if (actionConfig.state === AGENT_STATES.STOPPED || actionConfig.state === AGENT_STATES.PAUSED) {
       console.log("stopping or pausing agent");
       await endAgent(jobId);

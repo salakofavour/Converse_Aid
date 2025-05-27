@@ -13,6 +13,7 @@ export default function JobTemplate() {
     title: '',
     jobStartDate: '',
     jobEndDate: '',
+    interval: '',
     about: '',
     moreDetails: '',
     senderEmail: ''
@@ -133,21 +134,6 @@ export default function JobTemplate() {
     }
   };
 
-  // // Validate file
-  // const validateFile = (file) => {
-  //   const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
-  //   const maxSize = 15 * 1024 * 1024; // 15MB
-
-  //   if (!validTypes.includes(file.type)) {
-  //     return { isValid: false, error: 'Please upload a PDF, DOC, DOCX or TXT file' };
-  //   }
-
-  //   if (file.size > maxSize) {
-  //     return { isValid: false, error: 'File size must be less than 15MB' };
-  //   }
-
-  //   return { isValid: true };
-  // };
 
   // Handle form submission
   const handleSubmit = async () => {
@@ -260,6 +246,24 @@ export default function JobTemplate() {
                 )}
                 <p className="text-xs text-gray-500 mt-1">When the job process ends</p>
               </div>
+              <div className="transition-all duration-300 ease-in-out">
+                <label htmlFor="interval" className="block text-gray-700 mb-2">
+                  Interval (in Minutes)*
+                </label>
+                <input
+                  id="interval"
+                  name="interval"
+                  type="number"
+                  min="1"
+                  max="59"
+                  className="form-control focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-all"
+                  placeholder="Enter interval (1-59)"
+                  value={formData.interval}
+                  onChange={handleChange}
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">The interval between the agent's replies</p>
+              </div>
             </div>
           </div>
 
@@ -276,7 +280,7 @@ export default function JobTemplate() {
                         <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
                       </svg>
                       <p className="mb-2 text-sm text-gray-500"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                      <p className="text-xs text-gray-500">PDF, DOC, DOCX or TXT (MAX. 15MB)</p>
+                      <p className="text-xs text-gray-500">DOC, DOCX or TXT (MAX. 15MB)</p>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center">
@@ -300,7 +304,7 @@ export default function JobTemplate() {
                   <input
                     type="file"
                     className="hidden"
-                    accept=".pdf,.doc,.docx,.txt"
+                    accept=".doc,.docx,.txt"
                     onChange={(e) => {
                       const file = e.target.files[0];
                       if (file) {
@@ -430,9 +434,19 @@ export default function JobTemplate() {
             <button
               type="submit"
               className="btn btn-primary transition-all hover:scale-105 hover:shadow-md"
-              disabled={dateError}
+              disabled={dateError || isSubmitting}
             >
-              Next
+              {isSubmitting ? (
+                <div className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Processing...
+                </div>
+              ) : (
+                'Next'
+              )}
             </button>
           </div>
         </form>

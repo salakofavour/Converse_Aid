@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
-export default function Navbar({ user }) {
+export function Navbar({ user }) {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -22,7 +22,7 @@ export default function Navbar({ user }) {
   ];
 
   return (
-    <nav className="bg-white shadow-md sticky top-0 z-50">
+    <nav className="bg-white shadow-md sticky border-b border-gray-200 rounded-b-2xl top-0 z-50">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-8">
@@ -124,4 +124,14 @@ export default function Navbar({ user }) {
       </div>
     </nav>
   );
-} 
+}
+
+export function Footer() {
+  return(
+    <footer className="bg-white py-4 border-t border-gray-200">
+        <div className="container mx-auto px-4 text-center text-gray-600 text-sm">
+          © {new Date().getFullYear()} Converse-Aid. All rights reserved.
+        </div>
+      </footer>
+  )
+}

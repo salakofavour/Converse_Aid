@@ -14,6 +14,7 @@ export default function JobDetail() {
   const [error, setError] = useState(null);
   const [members, setMembers] = useState([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
+  const [canEdit, setCanEdit] = useState(false);
   
   // Load job and members data
   useEffect(() => {
@@ -47,6 +48,22 @@ export default function JobDetail() {
     loadData();
   }, [params.id]);
 
+  // Check if job can be edited (not closed)
+  const checkJobStatus = () => {
+    if (job?.status === "active") {
+      const isActive = new Date() <= new Date(job.job_end_date);
+      setCanEdit(isActive);
+    } else {
+      setCanEdit(false);
+    }
+  };
+
+  useEffect(() => {
+    if (job) {
+      checkJobStatus();
+    }
+  }, [job]);
+
   // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -59,9 +76,6 @@ export default function JobDetail() {
     if (!text) return [];
     return text.split('\n').filter(line => line.trim() !== '').map(line => line.trim());
   };
-
-  // Check if job can be edited (not closed)
-  const canEdit = job && (new Date() <= new Date(job.job_end_date));
 
   if (isLoading) {
     return (

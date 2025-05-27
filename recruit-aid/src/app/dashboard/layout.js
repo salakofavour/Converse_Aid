@@ -1,17 +1,9 @@
 'use client';
 
-import Navbar from '@/components/Navbar';
 import { getUser } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-// const navigation = [
-//   { name: 'Dashboard', href: '/dashboard' },
-//   { name: 'Create Job', href: '/dashboard/create-job' },
-//   { name: 'View Jobs', href: '/dashboard/view-jobs' },
-//   { name: 'Send Email', href: '/dashboard/send-email' },
-//   { name: 'Settings', href: '/dashboard/settings' }
-// ];
 
 export default function DashboardLayout({ children }) {
   const [user, setUser] = useState(null);
@@ -49,7 +41,6 @@ export default function DashboardLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-secondary">
-      <Navbar user={user} />
       <main className="container mx-auto px-4 py-6">
         {children}
       </main>

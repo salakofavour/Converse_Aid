@@ -51,7 +51,11 @@ export async function middleware(request) {
       !request.nextUrl.searchParams.has('code') && 
       request.nextUrl.pathname !== '/' && 
       request.nextUrl.pathname !== '/signin' && 
-      request.nextUrl.pathname !== '/signup'){
+      request.nextUrl.pathname !== '/signup' &&
+      request.nextUrl.pathname !== '/terms' &&
+      request.nextUrl.pathname !== '/privacy' &&
+      request.nextUrl.pathname !== '/pricing-contact'
+    ){
     return NextResponse.redirect(new URL('/', request.url));
   }
 
@@ -60,7 +64,8 @@ export async function middleware(request) {
   if (user && 
       (request.nextUrl.pathname === '/' || 
        request.nextUrl.pathname === '/signin' || 
-       request.nextUrl.pathname === '/signup')) {
+       request.nextUrl.pathname === '/signup')
+    ) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
