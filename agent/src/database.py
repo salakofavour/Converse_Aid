@@ -181,55 +181,58 @@ class DatabaseService:
             return True
         except Exception as e:
             raise
-    
-    # @retry_with_backoff()
-    # def update_email_details(self, job_id: str, email_details: Dict[str, Any]) -> bool:
-    #     """
-    #     Update email details in the jobs table.
-        
-    #     Args:
-    #         job_id: Job ID
-    #         email_details: Dict containing thread_id, message_id, etc.
-            
-    #     return:
-    #         Boolean indicating success
-            
-    #     Raises:
-    #         ValueError: If update fails
-    #     """
-    #     try:
-    #         response = (self.client.table('jobs')
-    #                 .update(email_details)
-    #                 .eq("id", job_id)
-    #                 .execute())
-                    
-    #         return True
-    #     except Exception as e:
-    #         raise
 
     
-    # @retry_with_backoff()
-    # def update_response(self, job_id: str, response: str) -> bool:
+    @retry_with_backoff()
+    def get_user_id(self, job_id: str) -> str:
         """
-        Update response column in the jobs table.
+        Get the user_id for a specific job.
         
         Args:
             job_id: Job ID
-            response: A string which contains a message.
             
         return:
-            Boolean indicating success
+            user_id: The user_id for the job
             
         Raises:
-            ValueError: If update fails
+            ValueError: If retrieval fails
         """
         try:
             response = (self.client.table('jobs')
-                    .update({"response": response})
+                    .select("user_id")
                     .eq("id", job_id)
+                    .single()
                     .execute())
                     
-            return True
+            return response.data[0]['user_id']
+        except Exception as e:
+            raise
+
+    @retry_with_backoff()
+    def is_subscribed(self, user_id: str) -> bool:
+        """
+        Get the subscription status for a specific user (really the job. if the user s unsubscribed, the job should not run).
+        
+        Args:
+            user_id: User ID
+            
+        return:
+            subscription_status: The subscription status for the job
+            
+        Raises:
+            ValueError: If retrieval fails
+        """
+        try:
+            response = (self.client.table('subscriptions')
+                    .select("status")
+                    .eq("user_id", user_id)
+                    .single()
+                    .execute())
+                    
+            if response.data[0]['status'].lower() == 'trialing' or response.data[0]['status'].lower() == 'active':
+                return True
+            else:
+                return False
         except Exception as e:
             raise
 

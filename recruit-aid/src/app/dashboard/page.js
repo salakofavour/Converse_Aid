@@ -67,7 +67,7 @@ export default function Dashboard() {
     loadData();
   }, []);
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -88,12 +88,10 @@ export default function Dashboard() {
       </div>
     );
   }
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Welcome back, {profile?.name || user.email}</h1>
-        <p className="mt-1 text-sm text-gray-500">Here's what's happening with your jobs</p>
+        <h1 className="text-xl font-bold text-gray-900">Welcome back {profile?.profile.name || user?.user.email},</h1>
       </div>
 
       {/* Stats Grid */}

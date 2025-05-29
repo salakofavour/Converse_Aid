@@ -110,7 +110,7 @@ class EmailAutomationApp:
             # Search for relevant information using the last email's body
             email_body = member.get("body", "")
             print("email_body: ", email_body)
-            receiver = f"hi {member['name_email']['name']}"
+            receiver = f"Hi {member['name_email']['name']},"
 
             email_context_prompt = PromptTemplate.from_template(
                 """Act as a helpful assistant.
@@ -134,32 +134,27 @@ class EmailAutomationApp:
                 message = f"member - {member['name_email']['name']} asked a question that is either not related to the job - {job['title']} or not in the KnowledgeBase. We continued the conversation but you can check your email with {member['name_email']['email']} and subject - {member['subject']} to see the question. It is the message before the member is informed not to ask questions that are not related to the job in question."
                 email_service.send_user_notification_email(message, self.member_id, self.job_id)
             
-            print("got here in create_message, mid create message", search_results)
 
             # Generate response using template
             
             prompt = PromptTemplate.from_template(
-                """Act as a professional and friendly email assistant. I need you to reply to emails using only the information provided in the "Context" below, which is retrieved from the knowledge base. Do not use any other information to answer questions.
+                """Act as a professional and friendly email assistant. I need you to create an email response body to an email using only the information provided in "Context" to create coherent sentences. Do not use any external tools or information to answer questions.
 
                 Instructions:
                 - Use the "Conversation History" only to match the tone and flow of the conversation, not for factual content.
-                - If the "email_context" is not a question but a greeting or gratitude, reply with a friendly greeting and ask how you can help as needed.
-                - If the "email_context" is a question, write a clear, concise reply (1-3 short paragraphs) strictly based on the "Context".
+                - If the "Email_context" is only a greeting or gratitude, reply with a friendly greeting or gratitude and ask how you can help as needed.
+                - If the "Email_context" is not a greeting or gratitude, write a clear, concise reply (1-3 short paragraphs) strictly based in "Context".
                 - Never apologize in your response.
-                - Always end the email with the following footer, visually centered at the bottom if possible (use HTML if allowed, otherwise just place it at the bottom):
-
-                This message was sent with Converse-Aid. Reply to this message to continue conversation.
-
-                Output only the plain text email body, with no HTML or special formatting unless otherwise specified.
+                - Always return the response in plain text format & text size 12.
                               
                     
                 "Context": {context}\n
-                "email_context": {email_context}\n
+                "Email_context": {email_context}\n
                 "Conversation History": {email_history}"""
 
             )
             #context is the result of the similarity search against the knowledge base
-            full_prompt = prompt.invoke({"context": context, "email_context": email_context, "email_history": email_body})
+            full_prompt = prompt.invoke({"context": context, "email_context": email_context, "email_history": email_body, "welcome": receiver})
             
             print("full_prompt: ", full_prompt)
 
@@ -192,14 +187,21 @@ class EmailAutomationApp:
         try:
             # Get member details
             member = db.get_member_details(self.member_id)
-            #get email response kept in state gotten from create_message
-            new_message = f"Hi {member['name_email']['name']}, \n\n {state['email_response']}" #here i will figure out how to add footers.
+
+            #get email response kept in state gotten from create_message & create new message
+            plain_message = f"Hi {member['name_email']['name'] or member['name_email']['email']}, \n\n 
+            {state['email_response']} \n\n 
+            This message was sent with Converse-Aid. Reply to this message to continue conversation.</h6>" #here i will figure out how to add footers.
             
-            print("got here in reply_thread", member)
+            html_message = f"Hi {member['name_email']['name'] or member['name_email']['email']}, \n\n 
+            {state['email_response']} \n\n 
+            <p style='text-align: center; font-size: 8px;'>This message was sent with <a href='www.google.com'>Converse-Aid</a>. Reply to this message to continue conversation.</p>" #here i will figure out how to add footers.
+
             # Prepare reply parameters
             reply_params = {
                 "to": member["name_email"]["email"],
-                "body": new_message,
+                "plain_body": plain_message,
+                "html_body": html_message,
                 "thread_id": member["thread_id"],
                 "subject": f"Re: {member['subject']}" if not member['subject'].startswith("Re:") else member['subject'],
                 "message_id": member["message_id"],
@@ -312,11 +314,14 @@ class EmailAutomationApp:
         try:
             # The first step will be to check if the job_id exists in the db, if it does not, return a message saying the job does not exist & delete the schedule
             job = db.get_job_details(self.job_id)
-            if not job or job["status"].lower() == "closed":
+            user_id = db.get_user_id(self.job_id)
+            is_subscribed = db.is_subscribed(user_id)
+
+            if not job or job["status"].lower() == "closed" or not is_subscribed:
                 util.delete_schedule(self.job_id)
                 return {
                     "status": "Job Agent deleted",
-                    "message": "Job does not exist in database or is closed. So, Job Agent schedule has also been deleted."
+                    "message": "Job does not exist in database or is closed or user is not subscribed. So, Job Agent schedule has also been deleted."
                 }
             # Validate authentication tokens
             auth_service.validate_token(self.job_id)

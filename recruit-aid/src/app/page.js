@@ -22,11 +22,11 @@ export default function Home() {
         <section className="w-full max-w-5xl mx-auto py-16 grid md:grid-cols-3 gap-8">
           <div className="bg-white rounded-lg shadow p-6 flex flex-col items-center text-center border-t-4 border-blue-500">
             <h3 className="font-semibold text-xl mb-2 text-blue-500">Total Control</h3>
-            <p className="text-gray-600">Set response intervals, control knowledgebase, and manage members for each agent. No risk of replying to the wrong person.</p>
+            <p className="text-gray-600">Set response intervals, control knowledgebase, and manage members for each agent. No risk of replying to the wrong thread or person.</p>
           </div>
           <div className="bg-white rounded-lg shadow p-6 flex flex-col items-center text-center border-t-4 border-blue-500">
             <h3 className="font-semibold text-xl mb-2 text-blue-500">Human-in-the-Loop</h3>
-            <p className="text-gray-600">Easily intervene for complex questions. Start the conversation and reply through Gmail while the agent continues seamlessly.</p>
+            <p className="text-gray-600">Easily intervene for complex questions. Start the conversation and even reply through Gmail app and the agent will continue seamlessly.</p>
           </div>
           <div className="bg-white rounded-lg shadow p-6 flex flex-col items-center text-center border-t-4 border-blue-500">
             <h3 className="font-semibold text-xl mb-2 text-blue-500">Knowledgebase-Driven</h3>

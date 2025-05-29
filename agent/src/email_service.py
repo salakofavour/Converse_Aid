@@ -275,7 +275,8 @@ class EmailService:
             
             # Create email message
             message = EmailMessage()
-            message.set_content(reply_params.get('body', ''))
+            message.set_content(reply_params.get('plain_body', '')) #Plain text body
+            message.add_alternative(reply_params.get('html_body', ''), subtype='html') #HTML body
             message["To"] = reply_params.get('to')  # Should be member's email
             message["From"] = reply_params.get('from', token_info['job_email'])
             message["Subject"] = reply_params.get('subject', '')

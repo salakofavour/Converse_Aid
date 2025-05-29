@@ -1,4 +1,4 @@
-import { sendSubscriptionNotification } from '@/lib/notifications';
+import { sendPaymentFailedNotification } from '@/lib/notifications';
 import { stripe } from '@/lib/stripe';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/supabase-server';
 //this file uses the admin/service role key created client for the webhook events (webhook to supabse -> server-to-server)
@@ -159,8 +159,6 @@ export async function handleWebhookEvent(event) {
   try {
     const supabase = createSupabaseAdminClient();
 
-    console.log('Received Stripe webhook event:', event.type);
-
     switch (event.type) {
       case 'checkout.session.completed':
         const session = event.data.object;
@@ -233,7 +231,7 @@ export async function handleWebhookEvent(event) {
       case 'invoice.payment_failed':
         const invoice = event.data.object;
         const customer = await stripe.customers.retrieve(invoice.customer);
-        await sendSubscriptionNotification(customer.email);
+        await sendPaymentFailedNotification(customer.email);
         break;
     }
 
@@ -246,66 +244,4 @@ export async function handleWebhookEvent(event) {
   }
 }
 
-/**
- * Checks and updates subscription statuses (cron scheduled)
- * @returns {Promise<{ success: boolean, error?: string }>}
- */
-export async function checkSubscriptions() {
-  try {
-    const supabase = await createSupabaseServerClient();
-    const now = new Date();
-
-    // Get all active and trial subscriptions with profiles
-    const { data: subscriptions } = await supabase
-      .from('subscriptions')
-      .select(`
-        *,
-        profiles!inner (
-          email,
-          job_count
-        )
-      `)
-      .in('status', [SUBSCRIPTION_STATUS.ACTIVE, SUBSCRIPTION_STATUS.TRIALING]);
-
-    if (!subscriptions) return { success: true };
-
-    for (const subscription of subscriptions) {
-      const subscriptionEnd = new Date(subscription.subscription_end);
-      const daysUntilExpiry = Math.ceil(
-        (subscriptionEnd.getTime() - now.getTime()) / 
-        (1000 * 60 * 60 * 24)
-      );
-
-      // Send notifications at 7, 4, and 1 day(s) before expiry
-      if ([7, 4, 1].includes(daysUntilExpiry)) {
-        if (subscription.profiles.job_count > 5) {
-          await sendSubscriptionNotification(
-            subscription.profiles.email,
-            daysUntilExpiry,
-            subscription.profiles.job_count
-          );
-        }
-      }
-
-      // If subscription has expired
-      if (daysUntilExpiry <= 0) {
-        if (subscription.profiles.job_count > 5) {
-          await cleanupExcessJobs(supabase, subscription.user_id);
-        }
-
-        // Update subscription status
-        await supabase
-          .from('subscriptions')
-          .update({ status: SUBSCRIPTION_STATUS.UNPAID })
-          .eq('id', subscription.id);
-      }
-    }
-
-    return { success: true };
-  } catch (error) {
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-} 
+ 
