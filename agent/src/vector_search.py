@@ -104,7 +104,7 @@ class VectorSearchService:
                     context += match.metadata["text"] + "\n\n"
             
             if not context:
-                context = "No relevant information found for this query."
+                context = None
             
             return {
                 "raw_results": results.matches,

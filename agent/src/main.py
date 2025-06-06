@@ -98,7 +98,7 @@ class EmailAutomationApp:
             llm = ChatCohere(
                 model=os.environ.get("LLM_MODEL"), 
                 temperature=os.environ.get("LLM_TEMPERATURE"), 
-                max_tokens=os.environ.get("LLM_MAX_TOKENS"), 
+                # max_tokens=os.environ.get("LLM_MAX_TOKENS"), 
                 max_retries=3
             )
 
@@ -111,55 +111,74 @@ class EmailAutomationApp:
             email_body = member.get("body", "")
             print("email_body: ", email_body)
             receiver = f"Hi {member['name_email']['name']},"
+            last_message = email_body.split(receiver)[0]
 
             email_context_prompt = PromptTemplate.from_template(
                 """Act as a helpful assistant.
-                    Your job is to understand the context of the last response not starting with {receiver} in the "conversation-thread" and extract any question from it in a single sentence.
-                    Understand that the question is going to be answered via a semantic search, so it needs to semantically represent what the last response not starting with {receiver} is about.
-                    "conversation-thread": {email_history}\n
-                   """
-            )
-            email_context = llm.invoke(email_context_prompt.invoke({"email_history": email_body, "receiver": receiver}))
-            print("email_context: ", email_context)
-            search_results = vector_search.search_with_text(self.job_id, email_context.content)
-            # Also provide a summary of the conversation thread in a few sentences later in the future.
-            print("did the vector search", search_results)
-            # Create a prompt with the context
-            if search_results["has_relevant_matches"]:
-                context = search_results["context"]
-            else:
-                context = "Your question is not related to this conversation. Please refrain from asking questions that are not related to this conversation."
-                #send a notification email to the user informing the user that an member has asked a question not in KnowledgeBase
-                
-                message = f"member - {member['name_email']['name']} asked a question that is either not related to the job - {job['title']} or not in the KnowledgeBase. We continued the conversation but you can check your email with {member['name_email']['email']} and subject - {member['subject']} to see the question. It is the message before the member is informed not to ask questions that are not related to the job in question."
-                email_service.send_user_notification_email(message, self.member_id, self.job_id)
-            
-
-            # Generate response using template
-            
-            prompt = PromptTemplate.from_template(
-                """Act as a professional and friendly email assistant. I need you to create an email response body to an email using only the information provided in "Context" to create coherent sentences. Do not use any external tools or information to answer questions.
 
                 Instructions:
-                - Use the "Conversation History" only to match the tone and flow of the conversation, not for factual content.
-                - If the "Email_context" is only a greeting or gratitude, reply with a friendly greeting or gratitude and ask how you can help as needed.
-                - If the "Email_context" is not a greeting or gratitude, write a clear, concise reply (1-3 short paragraphs) strictly based in "Context".
-                - Never apologize in your response.
-                - Always return the response in plain text format & text size 12.
-                              
-                    
-                "Context": {context}\n
-                "Email_context": {email_context}\n
-                "Conversation History": {email_history}"""
-
+                - First understand the discussion flow of "conversation-thread".
+                - Then extract the context of "last_message"
+                - if the extracted context is only a greeting or gratitude, create a sentence with the extracted context and return a friendly greeting or gratitude that always starts with "Thank you"and ask how you can help as needed.
+                - else if the extracted context is not a greeting or gratitude, return a sentence that is made with the extracted context, keeping in mind the discussion flow to match the tone and flow of the conversation, not for factual content.
+                - Note that the sentence will be used in a semantic search
+                "conversation-thread": {email_history}\n
+                "last_message": {last_message}
+                   """
             )
-            #context is the result of the similarity search against the knowledge base
-            full_prompt = prompt.invoke({"context": context, "email_context": email_context, "email_history": email_body, "welcome": receiver})
-            
-            print("full_prompt: ", full_prompt)
+            email_context = llm.invoke(email_context_prompt.invoke({"email_history": email_body, "last_message": last_message}))
 
-            result = llm.invoke(full_prompt.text)
-            response = result.content
+            #if email_context is a salutation return response = email_context.content else proceed with the below
+            if email_context.content.startswith("Thank you"):
+                response = email_context.content
+            else:
+                print("email_context: ", email_context)
+                search_results = vector_search.search_with_text(self.job_id, email_context.content)
+                # Also provide a summary of the conversation thread in a few sentences later in the future.
+                print("did the vector search", search_results)
+                # Create a prompt with the context
+                if search_results["has_relevant_matches"]:
+                    context = search_results["context"]
+                else:
+                    response = "Your question is not related to this conversation. Please refrain from asking questions that are not related to this conversation."
+                    #send a notification email to the user informing the user that an member has asked a question not in KnowledgeBase
+                    
+                    message = f"member - {member['name_email']['name']} asked a question that is either not related to the job - {job['title']} or not in the KnowledgeBase. We continued the conversation but you can check your email with {member['name_email']['email']} and subject - {member['subject']} to see the question. It is the message before the member is informed not to ask questions that are not related to the job in question."
+                    email_service.send_user_notification_email(message, self.member_id, self.job_id)
+                    return{
+                    "email_response": response,
+                    "messages": state.get("messages", []) +[{
+                    "role": "assistant"
+                }]
+                    }
+                
+
+                # Generate response using template
+                
+                prompt = PromptTemplate.from_template(
+                    """Act as a professional and friendly email assistant. I need you to create an email response body to an email using only the information provided in "Context" to create coherent sentences. Do not use any external tools or information to answer questions.
+
+                    Instructions:
+                    - Use the "Conversation_History" only to match the tone and flow of the conversation, not for factual content.
+                    - Using "Email_context", write a clear, concise reply (1-3 short paragraphs separated by new lines) strictly based in "Context".
+                    - Never apologize in your response.
+                    - Never include salutation in your response.
+                    - Never include a closing in your response.
+                    - Always return the response in plain text format & text size 14.
+                                
+                        
+                    "Context": {context}\n
+                    "Email_context": {email_context}\n
+                    "Conversation_History": {email_history}"""
+
+                )
+                #context is the result of the similarity search against the knowledge base
+                full_prompt = prompt.invoke({"context": context, "email_context": email_context, "email_history": email_body, "welcome": receiver})
+                
+                print("full_prompt: ", full_prompt)
+
+                result = llm.invoke(full_prompt.text)
+                response = result.content
             
             # Update member's response
             # db.update_member_response(self.member_id, response)
@@ -169,7 +188,6 @@ class EmailAutomationApp:
             return{
                 "email_response": response,
                 "messages": state.get("messages", []) +[{
-                "content": result.content,
                 "role": "assistant"
             }]
                 }
@@ -189,13 +207,14 @@ class EmailAutomationApp:
             member = db.get_member_details(self.member_id)
 
             #get email response kept in state gotten from create_message & create new message
-            plain_message = f"Hi {member['name_email']['name'] or member['name_email']['email']}, \n\n 
+            plain_message = f"""Hi {member['name_email']['name'] or member['name_email']['email']}, \n\n 
             {state['email_response']} \n\n 
-            This message was sent with Converse-Aid. Reply to this message to continue conversation.</h6>" #here i will figure out how to add footers.
+            This message was sent with Converse-Aid. Reply to this message to continue conversation.</h6>""" #here i will figure out how to add footers.
             
-            html_message = f"Hi {member['name_email']['name'] or member['name_email']['email']}, \n\n 
-            {state['email_response']} \n\n 
-            <p style='text-align: center; font-size: 8px;'>This message was sent with <a href='www.google.com'>Converse-Aid</a>. Reply to this message to continue conversation.</p>" #here i will figure out how to add footers.
+            html_message = f"""
+            Hi {member['name_email']['name'] or member['name_email']['email']},\n
+            <p>{state['email_response']}</p>\n
+            <p style='text-align: center; font-size: 11px;'>This message was sent with <a href='www.google.com'>Converse-Aid</a>. Reply to this message to continue conversation.</p>""" #here i will figure out how to add footers.
 
             # Prepare reply parameters
             reply_params = {
@@ -244,7 +263,7 @@ class EmailAutomationApp:
             llm = ChatCohere(
                 model=os.environ.get("LLM_MODEL"), 
                 temperature=os.environ.get("LLM_TEMPERATURE"), 
-                max_tokens=os.environ.get("LLM_MAX_TOKENS"), 
+                # max_tokens=os.environ.get("LLM_MAX_TOKENS"), 
                 max_retries=3
             )
             
@@ -314,14 +333,23 @@ class EmailAutomationApp:
         try:
             # The first step will be to check if the job_id exists in the db, if it does not, return a message saying the job does not exist & delete the schedule
             job = db.get_job_details(self.job_id)
-            user_id = db.get_user_id(self.job_id)
-            is_subscribed = db.is_subscribed(user_id)
+            #I am not combining the similar logic of util.delete_schedulr below becaus eif job is not found, user will still try to check first & that will result in error
 
-            if not job or job["status"].lower() == "closed" or not is_subscribed:
+            if not job or job["status"].lower() == "closed":
                 util.delete_schedule(self.job_id)
                 return {
                     "status": "Job Agent deleted",
                     "message": "Job does not exist in database or is closed or user is not subscribed. So, Job Agent schedule has also been deleted."
+                }
+            
+            user_id = db.get_user_id(self.job_id)
+            is_subscribed = db.is_subscribed(user_id)
+
+            if not is_subscribed:
+                util.delete_schedule(self.job_id)
+                return {
+                    "status": "Job Agent deleted",
+                    "message": "user is not subscribed. So, Job Agent schedule has also been deleted."
                 }
             # Validate authentication tokens
             auth_service.validate_token(self.job_id)

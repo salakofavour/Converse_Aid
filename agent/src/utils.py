@@ -120,11 +120,20 @@ class Util:
 
     @staticmethod
     def delete_schedule(job_id: str) -> None: #this is not yet defined but the idea is to call this function to delete a schedule(when the api is finished it will also be called here)
+        """
+        Delete a schedule for a job.
+        
+        Args:
+            job_id: The ID of the job to delete the schedule for
+            
+        """
+        api_key = os.environ.get('AGENT_API_KEY')
+        delete_schedule_url = os.environ.get('AGENT_DELETE_SCHEDULE')
         headers = {
             "Content-Type": "application/json",
-            "x-api-key": {os.environ.get('AGENT_API_KEY')}
+            "x-api-key": api_key
         }
-        response = requests.post(os.environ.get('AGENT_DELETE_SCHEDULE'), json={"job_id": job_id}, headers=headers)
+        response = requests.post(delete_schedule_url, json={"job_id": job_id}, headers=headers)
         if response.status_code == 200:
             return True
         else:

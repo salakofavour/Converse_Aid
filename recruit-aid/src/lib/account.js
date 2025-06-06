@@ -1,9 +1,9 @@
 // Account management functions
 
+import { fetchWithCSRF } from '@/lib/fetchWithCSRF';
 import { deletePineconeNamespaceDirect } from '@/lib/pinecone-ops';
 import { stripe } from '@/lib/stripe';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/supabase-server';
-import { fetchWithCSRF } from './fetchWithCSRF';
 
 /**
  * Changes the email address for the authenticated user
@@ -38,6 +38,7 @@ export async function changeEmail(newEmail) {
  */
 export async function deleteAccount(userId) {
   try {
+    console.log('Deleting account - hit lib method');
     const supabase = await createSupabaseServerClient();
     const requestId = Date.now(); // For logging purposes
 
@@ -56,10 +57,10 @@ export async function deleteAccount(userId) {
     if (subscription) {
       try {
         if (subscription.stripe_subscription_id) {
-          await stripe.subscriptions.del(subscription.stripe_subscription_id);
+          await stripe.subscriptions.delete(subscription.stripe_subscription_id);
         }
         if (subscription.stripe_customer_id) {
-          await stripe.customers.del(subscription.stripe_customer_id);
+          await stripe.customers.delete(subscription.stripe_customer_id);
         }
       } catch (stripeError) {
         console.error(`[${requestId}] Stripe deletion error:`, stripeError);

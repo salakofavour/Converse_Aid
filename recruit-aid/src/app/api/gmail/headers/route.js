@@ -36,13 +36,15 @@ export async function GET(request) {
       throw new Error('No sender configured');
     }
 
-    // Check if token needs refresh
-    const now = Date.now();
+    // Check if token needs refresh (I am saving te access token in db in seconds, so I am converting date.now to seconds before comaprison.)
+    const now = Math.floor(Date.now() / 1000);
+    // const now = Date.now();
     let access_token = sender.access_token;
     
     if (now >= sender.access_expires_in) {
       // Token expired, refresh it
       const refreshResult = await refreshAccessToken(sender.email, sender.refresh_token);
+
       if (!refreshResult.success) {
         throw new Error('Failed to refresh access token');
       }

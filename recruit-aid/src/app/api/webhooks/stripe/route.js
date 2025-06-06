@@ -28,12 +28,12 @@ export async function POST(req) {
     const result = await handleWebhookEvent(event);
     
     if (!result.success) {
-      throw new Error(result.error);
+      throw new Error("Webhook error");
     }
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error('Webhook error:', error);
+    // console.error('Webhook error:', error);
     return NextResponse.json(
       { error: error.message },
       { status: 500 }

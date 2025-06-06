@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
+    console.log("hit create-checkout in route");
     // Validate CSRF token
     const csrfError = await validateCSRFToken(request);
     if (csrfError) {

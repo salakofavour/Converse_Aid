@@ -8,6 +8,8 @@ export function CancellationWarningModal({ isOpen, onClose, onConfirm, jobCount 
       show={isOpen} 
       onHide={onClose} 
       centered
+      className="d-flex align-items-center justify-content-center"
+      dialogClassName="my-0"
       onEscapeKeyDown={onClose}
     >
       <Modal.Header closeButton>

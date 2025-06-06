@@ -11,19 +11,12 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState('profile');
   const [profileData, setProfileData] = useState({
     name: '',
-    email: '',
     company: '',
     role: '',
     phone: '',
     timezone: 'America/New_York'
   });
-  // const [notificationSettings, setNotificationSettings] = useState({
-  //   emailNotifications: true,
-  //   newApplications: true,
-  //   interviewReminders: true,
-  //   jobUpdates: false,
-  //   weeklyReports: true
-  // });
+
   const [senderEmails, setSenderEmails] = useState([]);
   const [newEmail, setNewEmail] = useState('');
   const [showAddEmail, setShowAddEmail] = useState(false);
@@ -47,7 +40,7 @@ export default function Settings() {
       try {
         setIsLoading(true);
         setError(null);
-        setIsNewProfile(false);
+        // setIsNewProfile(false);
         
         // Get profile data
         const response = await fetchWithCSRF('/api/profile');
@@ -59,15 +52,17 @@ export default function Settings() {
           hasProfile: !!profile,
           senderEmails: profile?.sender || []
         });
+        // Set isNewProfile based on whether profile exists
+        setIsNewProfile(!profile);
         
         // Set profile data
         setProfileData({
-          name: profile.name || '',
-          email: profile.email || '',
-          company: profile.company || '',
-          role: profile.role || '',
-          phone: profile.phone || '',
-          timezone: profile.timezone || 'America/New_York'
+          name: profile?.name || '',
+          // email: profile.email || '', //this is set from auth/user cannot be edited by user
+          company: profile?.company || '',
+          role: profile?.role || '',
+          phone: profile?.phone || '',
+          timezone: profile?.timezone || 'America/New_York'
         });
 
         // Set sender emails from profile data
@@ -82,7 +77,6 @@ export default function Settings() {
           throw new Error('Failed to fetch auth data');
         }
         const authData = await authResponse.json();
-        
         // Update profile email with auth email
         setProfileData(prev => ({
           ...prev,
@@ -224,7 +218,11 @@ export default function Settings() {
         }
         console.error('Error processing OAuth callback:', err);
         if (isMounted) {
-          setEmailError('Failed to process authentication. Please try again.');
+          if (err.code === 'ETIMEDOUT') {
+            setEmailError('Connection timed out. Please check your internet connection and try again.');
+          } else {
+            setEmailError('Failed to process authentication. Please try again.');
+          }
         }
       } finally {
         if (isMounted) {
@@ -253,13 +251,6 @@ export default function Settings() {
     }));
   };
 
-  // const handleNotificationChange = (e) => {
-  //   const { name, checked } = e.target;
-  //   setNotificationSettings(prev => ({
-  //     ...prev,
-  //     [name]: checked
-  //   }));
-  // };
 
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
@@ -273,7 +264,7 @@ export default function Settings() {
         setIsSubmitting(false);
         return;
       }
-
+      console.log("profileData", profileData);
       const response = await fetchWithCSRF('/api/profile', {
         method: isNewProfile ? 'POST' : 'PUT',
         headers: {
@@ -281,7 +272,6 @@ export default function Settings() {
         },
         body: JSON.stringify({
           ...profileData,
-          notificationSettings
         }),
       });
 
@@ -299,7 +289,7 @@ export default function Settings() {
         phone: profile.phone || '',
         timezone: profile.timezone || 'America/New_York'
       });
-      // setNotificationSettings(profile.notification_settings || notificationSettings);
+
       setIsNewProfile(false);
       toast.success('Profile updated successfully');
     } catch (err) {
@@ -438,7 +428,7 @@ export default function Settings() {
       }
 
       toast.success('Account deleted successfully');
-      router.push('/login');
+      window.location.href = '/';
     } catch (err) {
       console.error('Error deleting account:', err);
       setSecurityError(err.message || 'Failed to delete account. Please try again.');
@@ -789,14 +779,14 @@ export default function Settings() {
       {/* Email Change Modal */}
       {showEmailChangeModal && (
         <div className="fixed z-10 inset-0 overflow-y-auto">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+          <div className="flex items-center justify-center min-h-screen px-4 text-center sm:block sm:p-0">
             <div className="fixed inset-0 transition-opacity" aria-hidden="true">
               <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
             </div>
 
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+            <div className="inline-block align-middle bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
               <div>
                 <div className="mt-3 text-center sm:mt-5">
                   <h3 className="text-lg leading-6 font-medium text-gray-900">
@@ -870,14 +860,14 @@ export default function Settings() {
       {/* Delete Account Modal */}
       {showDeleteConfirmModal && (
         <div className="fixed z-10 inset-0 overflow-y-auto">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+          <div className="flex items-center justify-center min-h-screen px-4 text-center sm:block sm:p-0">
             <div className="fixed inset-0 transition-opacity" aria-hidden="true">
               <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
             </div>
 
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+            <div className="inline-block align-middle bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
               <div>
                 <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
                   <svg className="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -42,7 +42,7 @@ export default function SignUp() {
       
       setMessage({
         type: 'success',
-        text: 'Check your email for the magic link to sign up and sign in!'
+        text: 'Check your email for the magic link to sign up!'
       });
     } catch (error) {
       setMessage({
@@ -107,7 +107,7 @@ export default function SignUp() {
                   disabled={isLoading}
                 />
                 <label htmlFor="acceptTerms" className="form-check-label text-gray-600 ms-2">
-                  I accept the <a href="#" className="text-primary hover:underline">Terms of Service</a> and <a href="#" className="text-primary hover:underline">Privacy Policy</a>
+                  I accept the <a href="/terms" className="text-primary hover:underline">Terms of Service</a> and <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a>
                 </label>
               </div>
             </div>

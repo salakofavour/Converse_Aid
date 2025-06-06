@@ -77,10 +77,10 @@ export function UnsignedFooter() {
           <a href="/pricing-contact?section=pricing" className="text-gray-600 hover:text-[#3b82f6]">
             Pricing
           </a>
-          <a href="#" className="text-gray-600 hover:text-[#3b82f6]">
+          <a href="/privacy" className="text-gray-600 hover:text-[#3b82f6]">
             Privacy Policy
           </a>
-          <a href="#" className="text-gray-600 hover:text-[#3b82f6]">
+          <a href="/terms" className="text-gray-600 hover:text-[#3b82f6]">
             Terms of Service
           </a>
           <a href="https://twitter.com/" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#3b82f6]">

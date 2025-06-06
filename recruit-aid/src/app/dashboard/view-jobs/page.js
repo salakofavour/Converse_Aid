@@ -21,8 +21,8 @@ export default function ViewJobs() {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [jobToDelete, setJobToDelete] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
+  // const [isDeleting, setIsDeleting] = useState(false);
+  const [updatingJobs, setUpdatingJobs] = useState(new Set());
   // Add pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const jobsPerPage = 12;
@@ -141,7 +141,7 @@ export default function ViewJobs() {
     setError(null);
 
     try {
-      setIsDeleting(true);
+      // setIsDeleting(true);
       const response = await fetchWithCSRF(`/api/jobs/${jobToDelete.id}`, {
         method: 'DELETE'
       });
@@ -169,7 +169,7 @@ export default function ViewJobs() {
       });
       setShowDeleteModal(false);
       setJobToDelete(null);
-      setIsDeleting(false);
+      // setIsDeleting(false);
     }
   };
 
@@ -200,45 +200,36 @@ export default function ViewJobs() {
 
   // Update handleActionClick to handle invalid transitions
   const handleActionClick = async (e, jobId) => {
-    e.stopPropagation(); // Prevent job card click
+    e.stopPropagation();
     const selectedAction = selectedActions[jobId];
     const job = jobs.find(j => j.id === jobId);
-    
     if (!selectedAction) return;
-
-    // Validate transition before making the API call
     const validActions = getValidActions(job);
     if (!validActions.includes(selectedAction)) {
       toast.error(`Cannot ${selectedAction.toLowerCase()} from ${job.agent_state || 'current'} state`);
       return;
     }
-
+    setUpdatingJobs(prev => new Set(prev).add(jobId));
     try {
-      setIsUpdating(true);
       const response = await fetchWithCSRF('/api/jobs/update-agent-state', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          jobId,
-          state: selectedAction
-        })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId, action: selectedAction })
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to update job state');
-      }
-
-      setJobs(jobs.map(j => 
-        j.id === jobId ? { ...j, agent_state: selectedAction } : j
-      ));
+      if (!response.ok) throw new Error('Failed to update job state');
+      setJobs(jobs.map(j => j.id === jobId ? { ...j, agent_state: selectedAction } : j));
       toast.success('Job state updated successfully');
+      // Reset dropdown for this card
+      setSelectedActions(prev => ({ ...prev, [jobId]: '' }));
     } catch (error) {
       console.error('Error updating job state:', error);
       toast.error(error.message || 'Failed to update job state');
     } finally {
-      setIsUpdating(false);
+      setUpdatingJobs(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(jobId);
+        return newSet;
+      });
     }
   };
 
@@ -514,7 +505,7 @@ export default function ViewJobs() {
                             className={`form-select w-full focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-all
                               ${!isSubscribed || !jobStatuses[job.id]
                                 ? 'bg-gray-100 cursor-not-allowed opacity-60'
-                                : 'hover:border-gray-400'
+                                : 'hover:border-gray-400 cursor-pointer'
                               }`}
                             value={selectedActions[job.id] || ''}
                             onChange={(e) => handleActionSelect(job.id, e.target.value)}
@@ -526,7 +517,7 @@ export default function ViewJobs() {
                             ))}
                           </select>
                           {(!isSubscribed || !jobStatuses[job.id]) && (
-                            <div className="absolute top-1/2 -translate-y-1/2 right-8">
+                            <div className="absolute top-1/2 -translate-y-1/2 right-2">
                               <Tooltip.Provider>
                                 <Tooltip.Root>
                                   <Tooltip.Trigger asChild>
@@ -559,9 +550,19 @@ export default function ViewJobs() {
                               : 'btn-primary hover:bg-primary-dark'
                             }`}
                           onClick={(e) => handleActionClick(e, job.id)}
-                          disabled={!selectedActions[job.id] || !jobStatuses[job.id] || !isSubscribed}
+                          disabled={!selectedActions[job.id] || !jobStatuses[job.id] || !isSubscribed || updatingJobs.has(job.id)}
                         >
-                          Go
+                          {updatingJobs.has(job.id) ? (
+                            <div className="flex items-center justify-center">
+                              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Updating...
+                            </div>
+                          ) : (
+                            'Go'
+                          )}
                         </button>
                       </div>
                     </div>

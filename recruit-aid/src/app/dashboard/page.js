@@ -91,7 +91,7 @@ export default function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-xl font-bold text-gray-900">Welcome back {profile?.profile.name || user?.user.email},</h1>
+        <h1 className="text-xl font-bold text-gray-900">Welcome {profile?.profile?.name || user?.user?.email.split('@')[0] || "User"} ,</h1>
       </div>
 
       {/* Stats Grid */}

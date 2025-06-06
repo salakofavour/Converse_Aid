@@ -13,6 +13,8 @@ export function JobLimitModal({ isOpen, onClose }) {
       show={isOpen} 
       onHide={onClose} 
       centered
+      className="d-flex align-items-center justify-content-center"
+      dialogClassName="my-0"
       onEscapeKeyDown={onClose}
     >
       <Modal.Header closeButton>

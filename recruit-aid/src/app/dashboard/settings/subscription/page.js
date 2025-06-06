@@ -52,6 +52,7 @@ export default function Subscription() {
   const handleUpgrade = async () => {
     try {
       setIsUpdating(true);
+      console.log("hit create-checkout in page");
       const response = await fetchWithCSRF('/api/subscriptions/create-checkout', {
         method: 'POST'
       });
@@ -66,7 +67,7 @@ export default function Subscription() {
       }
 
       // Redirect to Stripe Checkout
-      window.location.href = data.checkoutUrl;
+      window.location.href = data.url;
     } catch (err) {
       console.error('Error creating checkout session:', err);
       toast.error('Failed to create checkout session');
@@ -182,7 +183,7 @@ export default function Subscription() {
                 </li>
               )}
             </ul>
-            <p className="text-3xl font-bold mb-4">$10/month</p>
+            <p className="text-3xl font-bold mb-4">$40/month</p>
           </div>
         </div>
 

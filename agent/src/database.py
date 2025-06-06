@@ -40,7 +40,7 @@ class DatabaseService:
             raise ConnectionError(f"Could not connect to Supabase: {str(e)}")
     
     @retry_with_backoff()#check jobs
-    def get_job_details(self, job_id: str) -> Dict[str, Any]:
+    def get_job_details(self, job_id: str) -> Optional[Dict[str, Any]]:
         """
         Get details for a specific job.
         
@@ -48,10 +48,7 @@ class DatabaseService:
             job_id: The UUID of the job
             
         return:
-            Dict containing job details
-            
-        Raises:
-            ValueError: If job not found
+            Dict containing job details or None if not found
         """
         try:
             query = (self.client.table("jobs")
@@ -61,7 +58,7 @@ class DatabaseService:
                     )
             
             if not query.data:
-                raise ValueError(f"No job found with id: {job_id}")
+                return None
             
             return query.data[0]
         except Exception as e:
@@ -184,7 +181,7 @@ class DatabaseService:
 
     
     @retry_with_backoff()
-    def get_user_id(self, job_id: str) -> str:
+    def get_user_id(self, job_id: str) -> Optional[str]:
         """
         Get the user_id for a specific job.
         
@@ -192,24 +189,21 @@ class DatabaseService:
             job_id: Job ID
             
         return:
-            user_id: The user_id for the job
-            
-        Raises:
-            ValueError: If retrieval fails
+            user_id: The user_id for the job or None if not found
         """
         try:
             response = (self.client.table('jobs')
                     .select("user_id")
                     .eq("id", job_id)
-                    .single()
                     .execute())
-                    
+            if not response.data:
+                return None
             return response.data[0]['user_id']
         except Exception as e:
             raise
 
     @retry_with_backoff()
-    def is_subscribed(self, user_id: str) -> bool:
+    def is_subscribed(self, user_id: str) -> Optional[bool]:
         """
         Get the subscription status for a specific user (really the job. if the user s unsubscribed, the job should not run).
         
@@ -217,22 +211,18 @@ class DatabaseService:
             user_id: User ID
             
         return:
-            subscription_status: The subscription status for the job
-            
-        Raises:
-            ValueError: If retrieval fails
+            subscription_status: The subscription status for the job or None if not found
         """
         try:
             response = (self.client.table('subscriptions')
                     .select("status")
                     .eq("user_id", user_id)
-                    .single()
                     .execute())
                     
-            if response.data[0]['status'].lower() == 'trialing' or response.data[0]['status'].lower() == 'active':
-                return True
-            else:
-                return False
+            if not response.data:
+                return None
+                
+            return response.data[0]['status'].lower() == 'trialing' or response.data[0]['status'].lower() == 'active'
         except Exception as e:
             raise
 

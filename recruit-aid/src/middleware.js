@@ -54,6 +54,7 @@ export async function middleware(request) {
       request.nextUrl.pathname !== '/signup' &&
       request.nextUrl.pathname !== '/terms' &&
       request.nextUrl.pathname !== '/privacy' &&
+      request.nextUrl.pathname !== '/about' &&
       request.nextUrl.pathname !== '/pricing-contact'
     ){
     return NextResponse.redirect(new URL('/', request.url));

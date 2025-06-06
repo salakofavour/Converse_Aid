@@ -23,8 +23,8 @@ REQUIRED_ENV_VARS = [
     "TOKEN_URL",
     "GMAIL_URL",
     "LLM_MODEL",
-    "LLM_TEMPERATURE",
-    "LLM_MAX_TOKENS"
+    "LLM_TEMPERATURE"
+    # "LLM_MAX_TOKENS"
 ]
 
 def ensure_env_vars() -> bool:

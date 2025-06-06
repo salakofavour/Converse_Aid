@@ -3,8 +3,9 @@ import { validateCSRFToken } from '@/lib/csrf';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { NextResponse } from 'next/server';
 
-export async function POST(request) {
+export async function DELETE(request) {
   try {
+    console.log('Deleting account - hit route');
     // Validate CSRF token
     const csrfError = await validateCSRFToken(request);
     if (csrfError) {

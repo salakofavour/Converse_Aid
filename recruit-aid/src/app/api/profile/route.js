@@ -73,6 +73,7 @@ export async function POST(request) {
           id: user.id,
           name,
           company,
+          email: user.email,
           role,
           phone,
           timezone
@@ -102,7 +103,7 @@ export async function POST(request) {
 // PUT /api/profile
 export async function PUT(request) {
   try {
-    const { name, company, role, phone, timezone, notificationSettings } = await request.json();
+    const { name, company, role, phone, timezone } = await request.json();
 
     if (!name) {
       return NextResponse.json(
@@ -131,8 +132,7 @@ export async function PUT(request) {
         company,
         role,
         phone,
-        timezone,
-        notification_settings: notificationSettings
+        timezone
       })
       .eq('id', user.id)
       .select()

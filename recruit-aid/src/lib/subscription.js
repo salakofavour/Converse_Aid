@@ -100,7 +100,7 @@ export async function createSubscription(userId, email) {
         has_previous_subscription: existingSubscription ? 'true' : 'false'
       }
     });
-
+    console.log("session created", session.url);
     return {
       success: true,
       checkoutUrl: session.url

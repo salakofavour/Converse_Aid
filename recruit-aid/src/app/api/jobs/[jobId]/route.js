@@ -68,34 +68,64 @@ export async function PUT(request, { params }) {
         { status: 401 }
       );
     }
-//2 times job is updated in whole app, one with full data in either create or update job, & one with status update. Both are handled here.
-    if (jobData.status) {
-      const { job, error } = await supabase
+
+    let job;
+    let error;
+
+    // if (jobData.status) {
+    //   // Handle status update
+    //   const result = await supabase
+    //     .from('jobs')
+    //     .update({ status: jobData.status })
+    //     .eq('id', jobId)
+    //     .select()
+    //     .single();
+      
+    //   job = result.data;
+    //   error = result.error;
+    // } else {
+      // Extract file_content before sending to Supabase
+      const file_content = jobData.file_content;
+      delete jobData.file_content;
+
+      // Update the specific job
+      const result = await supabase
         .from('jobs')
-        .update({ status: jobData.status })
+        .update(jobData)
         .eq('id', jobId)
+        .eq('user_id', user.id)
         .select()
         .single();
-  
-      if (error) throw new Error('Error updating job status:', error.message);
-    
-    }else{
-    // Extract file_content before sending to Supabase
-    const file_content = jobData.file_content;
-    delete jobData.file_content;
 
+      job = result.data;
+      error = result.error;
 
-    // Update the specific job
-    const { job, error: jobError } = await supabase
-      .from('jobs')
-      .update(jobData)
-      .eq('id', jobId)
-      .eq('user_id', user.id)
-      .select()
-      .single();
+      if (!error && job) {
+        // If there's file content, update Pinecone vectors with it, else update Pinecone with about and more_details
+        let content_to_upload = null;
+        if (file_content) {
+          content_to_upload = file_content;
+        } else if(jobData.about || jobData.more_details) {
+          content_to_upload = jobData.about + jobData.more_details;
+        }
 
-    if (jobError) {
-      console.error('Error updating job:', jobError);
+        if (content_to_upload) {
+          try {
+            const pineconeInfo = {
+              id: jobId,
+              content_to_upload
+            };
+            await uploadVectors(pineconeInfo);
+          } catch (pineconeError) {
+            console.error('Error updating Pinecone vectors:', pineconeError);
+            // Don't throw the error as the DB update was successful
+          }
+        }
+      // }
+    }
+
+    if (error) {
+      console.error('Error updating job:', error);
       return NextResponse.json(
         { error: 'Failed to update job' },
         { status: 500 }
@@ -109,25 +139,6 @@ export async function PUT(request, { params }) {
       );
     }
 
-    // If there's file content, update Pinecone vectors with it, else update Pinecone with about and more_details
-    let content_to_upload = null;
-    if (file_content) {
-      content_to_upload = file_content;
-    } else if(jobData.about || jobData.more_details) {
-      content_to_upload = jobData.about + jobData.more_details;
-    }
-
-    try {
-    const pineconeInfo = {
-        id: jobId,
-        content_to_upload
-    };
-    await uploadVectors(pineconeInfo);
-    } catch (pineconeError) {
-    console.error('Error updating Pinecone vectors:', pineconeError);
-    // Don't throw the error as the DB update was successful
-    }
-  }
     return NextResponse.json({ job });
   } catch (error) {
     console.error('Error in job PUT route:', error);
