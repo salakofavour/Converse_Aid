@@ -12,7 +12,7 @@ docker compose run --rm server python run.py --job-id 123
 
 #to build When I make changes to the source code itself, run
 `docker compose up --build`.
-to ensure i hae the lates version of the base image.
+to ensure i hvae the latest version of the base image.
 
 Your application will be available at http://localhost:8000.
 
