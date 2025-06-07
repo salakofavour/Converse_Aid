@@ -190,14 +190,14 @@ export default function NewMessage() {
       
       // Update message IDs and fetch headers for successful sends
       if (sendResult.successfulRecipients?.length > 0) {
-        console.log("Starting header fetching for recipients:", sendResult.successfulRecipients);
+        // console.log("Starting header fetching for recipients:", sendResult.successfulRecipients);
         // Fetch headers for each successful recipient
         const headerPromises = sendResult.successfulRecipients.map(async (recipient) => {
           try {
-            console.log("Fetching headers for recipient:", recipient.email);
+            // console.log("Fetching headers for recipient:", recipient.email);
             const headerResponse = await fetchWithCSRF(`/api/gmail/headers?gmailId=${recipient.gmailId}`);
             const headerData = await headerResponse.json();
-            console.log("Raw headerData received:", headerData);
+            // console.log("Raw headerData received:", headerData);
             return {
               id: recipient.id,
               gmailId: recipient.gmailId,
@@ -226,7 +226,7 @@ export default function NewMessage() {
           });
 
             //always console the response just for debugging for now, it contains the success & failures
-            console.log("Result from update message IDs", updateResponse);
+            // console.log("Result from update message IDs", updateResponse);
         }
       }
 

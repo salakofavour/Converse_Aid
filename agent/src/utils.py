@@ -52,48 +52,7 @@ class Util:
     """
 
 
-    # def check_job_id_exists(job_id: str) -> bool:
-    #     """
-    #     Check if a job ID exists in the database.
-        
-    #     Args:
-    #         job_id: Job ID to check
-            
-    #     Returns:
-    #         True if the job ID exists, False otherwise
-    #     """
-    #     try:
-    #         job_details = db.get_job_details(job_id)
-    #         return True if job_details is not None else False
-    #     except Exception as e:
-    #         raise(f"Error checking if job ID exists: {e}")
 
-    # def notification_message(message: str, member_id: str="", job_id: str="", isJob:bool=False) -> str: #this is here incase I need to make changes to the message, I can do it here instead of having to change it in multiple places
-    #     """
-    #     Generate a notification message for a user.
-        
-    #     Args:
-    #         member_id: The ID of the member
-    #         job_id: The ID of the job
-    #         message: The message to send to the user
-            
-    #     Returns:
-    #         A dictionary containing the needed information to send a notification message for the user
-    #     """
-    #     member_details = db.get_member_details(member_id)
-    #     job_details = db.get_job_details(job_id)
-
-    #     if isJob:
-    #         email_message = message
-    #     else:
-    #         email_message = message.format(member_email=member_details["name_email"]["email"], subject_title=member_details["subject"])
-        
-    #     return{
-    #         "body": email_message,
-    #         "to": job_details["email"],
-    #         "subject": "Urgent Message from Converse",
-    #         "from": os.environ.get("EMAIL_FROM")
-    #     };
     @staticmethod
     def check_send_limit(response: dict) -> bool:
         """

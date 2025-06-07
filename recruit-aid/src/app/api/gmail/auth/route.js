@@ -44,7 +44,7 @@ export async function POST(request) {
 
     // First check if there's a body
     const contentType = request.headers.get('content-type');
-    console.log('Content-Type:', contentType);
+    // console.log('Content-Type:', contentType);
     
     if (!contentType || !contentType.includes('application/json')) {
       console.error('Invalid content type:', contentType);

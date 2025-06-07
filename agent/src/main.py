@@ -4,7 +4,6 @@ import asyncio
 from typing import Dict, Any, Optional, List, Annotated
 from langchain_core.prompts import PromptTemplate
 from langchain_cohere import ChatCohere
-# from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -72,7 +71,7 @@ class EmailAutomationApp:
             if response: 
                 # Update member details with the new message_id
                 message_data = email_service.get_message(self.job_id, response.get("id"))
-                print("message_data from recently sent message: ", message_data)
+                # print("message_data from recently sent message: ", message_data)
 
                 db.update_member_details(self.member_id, {
                     "message_id": message_data.get("message_id"),
@@ -109,7 +108,7 @@ class EmailAutomationApp:
             
             # Search for relevant information using the last email's body
             email_body = member.get("body", "")
-            print("email_body: ", email_body)
+            # print("email_body: ", email_body)
             receiver = f"Hi {member['name_email']['name']},"
             last_message = email_body.split(receiver)[0]
 
@@ -134,8 +133,8 @@ class EmailAutomationApp:
             else:
                 print("email_context: ", email_context)
                 search_results = vector_search.search_with_text(self.job_id, email_context.content)
-                # Also provide a summary of the conversation thread in a few sentences later in the future.
-                print("did the vector search", search_results)
+ 
+                # print("did the vector search", search_results)
                 # Create a prompt with the context
                 if search_results["has_relevant_matches"]:
                     context = search_results["context"]
@@ -173,15 +172,14 @@ class EmailAutomationApp:
 
                 )
                 #context is the result of the similarity search against the knowledge base
-                full_prompt = prompt.invoke({"context": context, "email_context": email_context, "email_history": email_body, "welcome": receiver})
+                full_prompt = prompt.invoke({"context": context, "email_context": email_context, "email_history": email_body})
                 
                 print("full_prompt: ", full_prompt)
 
                 result = llm.invoke(full_prompt.text)
                 response = result.content
             
-            # Update member's response
-            # db.update_member_response(self.member_id, response)
+
             # Update email response in state
             state["email_response"] = response
             print("got here in create_message, finished create message")
@@ -234,7 +232,7 @@ class EmailAutomationApp:
             if response: 
                 #update member details with the new message_id, thread_id and overall_message_id of the just sent email
                 message_data = email_service.get_message(self.job_id, response.get("id"))
-                print("message_data from recently sent message: ", message_data)
+                # print("message_data from recently sent message: ", message_data)
 
                 db.update_member_details(self.member_id, {
                     "message_id": message_data.get("message_id")
@@ -333,7 +331,7 @@ class EmailAutomationApp:
         try:
             # The first step will be to check if the job_id exists in the db, if it does not, return a message saying the job does not exist & delete the schedule
             job = db.get_job_details(self.job_id)
-            #I am not combining the similar logic of util.delete_schedulr below becaus eif job is not found, user will still try to check first & that will result in error
+            #I am not combining the similar logic of util.delete_schedulr below because if job is not found, user will still try to check first & that will result in error
 
             if not job or job["status"].lower() == "closed":
                 util.delete_schedule(self.job_id)
@@ -386,7 +384,7 @@ class EmailAutomationApp:
 
                         # Directly call the start_message function to send the default initial message
                         start_message_result = self.start_message()
-                        print("start_message_result: ", start_message_result)
+                        # print("start_message_result: ", start_message_result)
 
                         results.append({
                             "member_id": member['id'],

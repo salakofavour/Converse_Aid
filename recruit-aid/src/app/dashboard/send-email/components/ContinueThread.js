@@ -154,7 +154,7 @@ export default function ContinueThread() {
 
 
       const missingThreadInfo = fullMemberInfo.filter(member => !member.overall_message_id);
-      console.log("viewing selected members", fullMemberInfo); 
+      // console.log("viewing selected members", fullMemberInfo); 
       if (missingThreadInfo.length > 0) {
         setError(`There is no thread to continue for: ${missingThreadInfo.map(a => a.name_email.name).join(', ')}`);
         return;
@@ -179,7 +179,7 @@ export default function ContinueThread() {
         selectedJob.Job_email,
         sender.refresh_token
       );
-      console.log("access token has been refreshed and sender credential gotten")
+      // console.log("access token has been refreshed and sender credential gotten")
 
       // Send email
       const sendResponse = await fetchWithCSRF('/api/gmail/send/thread', {
@@ -243,7 +243,7 @@ export default function ContinueThread() {
           });
 
           //always console the response just for debugging for now, it contains the success & failures
-          console.log("Result from update message IDs", updateResponse);
+          // console.log("Result from update message IDs", updateResponse);
         }
       }
 

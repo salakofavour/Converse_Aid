@@ -94,7 +94,7 @@ export default function ViewJobs() {
 
   // Add a debug log for isSubscribed state changes
   useEffect(() => {
-    console.log('isSubscribed state updated:', isSubscribed);
+    console.log('isSubscribed:', isSubscribed);
   }, [isSubscribed]);
 
   // Format date for display

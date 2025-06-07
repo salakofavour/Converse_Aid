@@ -3,9 +3,7 @@ import json
 from typing import Dict, Any, Optional, Union, List
 from supabase import create_client, Client
 from src.utils import retry_with_backoff
-# from dotenv import load_dotenv
 import src.config as config
-# load_dotenv()
 
 class DatabaseService:
     """
@@ -278,30 +276,6 @@ class DatabaseService:
         except Exception as e:
             raise
 
-    # @retry_with_backoff()
-    # def update_member_response(self, member_id: str, response: str) -> bool:
-    #     """
-    #     Update the response field for an member.
-        
-    #     Args:
-    #         member_id: The UUID of the member
-    #         response: The response text
-            
-    #     Returns:
-    #         Boolean indicating success
-            
-    #     Raises:
-    #         ValueError: If update fails
-    #     """
-    #     try:
-    #         response = (self.client.table('members')
-    #                 .update({"response": response})
-    #                 .eq('id', member_id)
-    #                 .execute())
-            
-    #         return True
-    #     except Exception as e:
-    #         raise
 
     @retry_with_backoff()
     def update_member_details(self, member_id: str, details: Dict[str, Any]) -> bool:
@@ -332,7 +306,7 @@ class DatabaseService:
                 k: v for k, v in details.items() 
                 if k in valid_fields
             }
-            print("update_data: ", update_data)
+            # print("update_data: ", update_data)
             
             if not update_data:
                 raise ValueError("No valid fields to update")

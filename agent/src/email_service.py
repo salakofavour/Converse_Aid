@@ -9,10 +9,8 @@ from src.auth import auth_service
 import resend
 import sys
 from src.utils import util
-# from dotenv import load_dotenv
 import src.config as config
 
-# load_dotenv()
 
 class EmailService:
     """
@@ -40,7 +38,7 @@ class EmailService:
         try:
             # Get valid access token
             token_info = auth_service.validate_token(job_id)
-            print("token_info: ", token_info)
+            # print("token_info: ", token_info)
             
             # Set up request headers
             headers = {
@@ -51,7 +49,7 @@ class EmailService:
             # Make the API request
             url = f"{os.environ.get("GMAIL_URL")}me/threads/{thread_id}"
             thread_response = requests.get(url, headers=headers)
-            print("thread_response: ", thread_response)
+            # print("thread_response: ", thread_response)
             
             if thread_response.status_code != 200:
                 raise ConnectionError(f"Gmail API thread fetch failed: {thread_response.status_code}")
@@ -189,7 +187,7 @@ class EmailService:
             # Get valid access token
             token_info = auth_service.validate_token(job_id)
 
-            print("token_info: ", token_info)
+            # print("token_info: ", token_info)
             
             # Set up request headers
             headers = {
@@ -230,12 +228,13 @@ class EmailService:
             #check if the send limit has been reached, send user a notification email & exit if so.
             #at this point if successful the message has being sent already
             send_limit_response = util.check_send_limit(response)
+            print("check send_limit_response: ", send_limit_response)
 
             if send_limit_response.get("isExceeded"):
                 self.send_user_notification_email(isJob=True, job_id=job_id, message=send_limit_response.get("message"))
                 sys.exit(0);
 
-            print("send reply response: ", response)
+            # print("send reply response: ", response)
 
             if response.status_code != 200:
                 print(f"Error response body: {response.text}")
@@ -302,11 +301,12 @@ class EmailService:
 
             #check if the send limit has been reached, send user a notification email & exit if so
             send_limit_response = util.check_send_limit(response)
+            print("check send_limit_response: ", send_limit_response)
             if send_limit_response.get("isExceeded"):
                 self.send_user_notification_email(isJob=True, job_id=job_id, message=send_limit_response.get("message"))
                 sys.exit(0);
             
-            print("send reply response: ", response)
+            # print("send reply response: ", response)
 
             if response.status_code != 200:
                 print(f"Error response body: {response.text}")
@@ -337,38 +337,21 @@ class EmailService:
             # Get member details for context
             member = db.get_member_details(member_id)
             
-            # # Build search query for this specific member
-            # subject = f"subject:{member.get('subject', '')}"
-            # from_email = f"from:{member_email}"
-            # search_query = f"{subject} {from_email}" #  eventually I wiill use this implementation along with the start date
-            # # search_query = f"subject:Newest Test {from_email}" #previously partly haedcoded
-            # # Search for matching emails
-            # messages = self.search_emails(job_id, search_query)
-            
-            # if not messages:
-            #     return {"status": "no_emails", "message": f"No emails found from {member_email}"}
-            
-            # # Get the latest message's thread
-            # latest_message = messages[0]
-            # thread_id = latest_message.get("threadId")
 
-            # #repeatation is below, also need to recheck the importance of overall check. dont need overalll_message_id or this check
-            # #the check is dumb because it checks if the thread is the same as what we processed before
-            
-            # # Check if this is the same thread we've processed before
-            # if member.get("thread_id") == thread_id and member.get("overall_message_id") == latest_message.get("id"):
-            #     return {
-            #         "status": "no_new_messages", 
-            #         "message": "No new messages in the thread since last check"
-            #     }
             thread_id = member.get("thread_id")
             if not thread_id:
-                # raise ValueError("Thread ID not found in member record, ensure the user has sent at least one email to the member")
                 print("Thread ID not found in member record, we will send the initial message")
                 return {
                 "status": "no initial message",
                 "message": "No initial message sent to the member"
                 }
+
+
+            #Note: each member process runs this "check_For emails" function completely before going to the next member process
+            # so the validate_token process runsonly once in get_thread function that is called first & always.
+            # & also in the get_message(this is called after check for email function in either the first_message or reply so the token needs to be checked
+            # again to ensure the token is valid)
+            
             # Get the full thread
             thread = self.get_thread(job_id, thread_id)
             
@@ -406,8 +389,9 @@ class EmailService:
         except Exception as e:
             raise
 
-    @retry_with_backoff() #implementation to send user a notification email I cannot use the email from here to send important/error email. like the refresh_token error, if that is wrong the email sending will also be wrong so wont send
-    #of cousrse i can, the refresh_token and all that is when i want to use the user's email to perform actions. In this I am using the business's email to send emails
+    #implementation to send user a notification email I cannot use the email from here to send important/error email. like the refresh_token error, if that is wrong the email sending will also be wrong so wont send
+    #of course i can, the refresh_token and all that is when i want to use the user's email to perform actions. In this I am using the business's email to send emails
+    @retry_with_backoff() 
     def send_user_notification_email(self, message: str, member_id: str="", job_id: str="", isJob: bool=False) -> Dict[str, Any]:
         """
         Send a notification email to the user.
@@ -447,7 +431,7 @@ class EmailService:
                 "html": "<h2>Dear User, </h2>" + "<p>" + body + "</p>",
             }
             response = resend.Emails.send(params)
-            print("send user notification email response: ", response)
+            print("send user notification email response")
 
             if response.status_code != 200:
                 print(f"Error response body: {response.text}")

@@ -4,11 +4,8 @@ import requests
 from typing import Dict, Any, Optional, Union
 from src.utils import retry_with_backoff
 from src.database import db
-# from src.utils import util
-# from src.email_service import email_service
-# from dotenv import load_dotenv
 import src.config as config
-# load_dotenv()
+
 
 class AuthService:
     """

@@ -211,7 +211,7 @@ export default function EditJob() {
       e.preventDefault();
       setIsSubmitting(true);
       setError(null);
-      console.log("in handle submit, to update state", formData.original_filename);
+      // console.log("in handle submit, to update state", formData.original_filename);
 
       let jobData = {
         title: formData.title,

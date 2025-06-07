@@ -67,7 +67,7 @@ export default function Settings() {
 
         // Set sender emails from profile data
         if (profile?.sender) {
-          console.log('Setting sender emails from profile:', profile.sender);
+          // console.log('Setting sender emails from profile:', profile.sender);
           setSenderEmails(profile.sender);
         }
 
@@ -136,7 +136,7 @@ export default function Settings() {
         }
 
         // Process OAuth callback
-        console.log('Making fetch request to /api/gmail/auth with:', { code, state });
+        // console.log('Making fetch request to /api/gmail/auth with:', { code, state });
         const response = await fetchWithCSRF('/api/gmail/auth', {
           method: 'POST',
           headers: {
@@ -153,7 +153,7 @@ export default function Settings() {
 
         if (!response.ok) {
           const errorData = await response.json();
-          console.log("Error response data:", errorData);
+          // console.log("Error response data:", errorData);
           
           // Handle invalid_grant error specifically
           if (errorData.error === 'invalid_grant') {
@@ -165,17 +165,17 @@ export default function Settings() {
         }
 
         const data = await response.json();
-        console.log('Response data received:', data);
+        // console.log('Response data received:', data);
 
         if (data.error) {
-          console.log("error in data received", data.error);
+          // console.log("error in data received", data.error);
           setEmailError(data.error);
         } else if (data.success) {
           console.log('OAuth successful, updating sender emails...');
           
           // Update sender emails from profile data
           if (data.profile?.sender) {
-            console.log('Updating sender emails from profile:', data.profile.sender);
+            // console.log('Updating sender emails from profile:', data.profile.sender);
             setSenderEmails(data.profile.sender);
           } else {
             console.log('No profile data in response, fetching fresh profile...');
@@ -188,11 +188,11 @@ export default function Settings() {
                 senderEmails: profile?.sender || []
               });
               if (profile) {
-                console.log('Updating sender emails from fresh profile:', profile.sender);
+                // console.log('Updating sender emails from fresh profile:', profile.sender);
                 setSenderEmails(profile.sender || []);
               }
             } else {
-              console.error('Failed to refresh profile data:', await profileResponse.text());
+              console.error('Failed to refresh profile data');
             }
           }
 
@@ -203,7 +203,7 @@ export default function Settings() {
           setEmailError(''); // Clear any previous errors
           
           // Show success message
-          console.log('About to show success toast for email:', data.email);
+          // console.log('About to show success toast for email:', data.email);
           if (data.email) {
             toast.success(`Email ${data.email} added successfully!`, {
               duration: 5000,
@@ -264,7 +264,7 @@ export default function Settings() {
         setIsSubmitting(false);
         return;
       }
-      console.log("profileData", profileData);
+      // console.log("profileData", profileData);
       const response = await fetchWithCSRF('/api/profile', {
         method: isNewProfile ? 'POST' : 'PUT',
         headers: {
@@ -329,7 +329,7 @@ export default function Settings() {
       }
 
       const { url } = await response.json();
-      console.log('Starting Gmail OAuth flow for:', newEmail);
+      // console.log('Starting Gmail OAuth flow for:', newEmail);
       // Redirect to Gmail OAuth consent screen
       window.location.href = url;
     } catch (err) {

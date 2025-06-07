@@ -4,9 +4,7 @@ from typing import Dict, Any, List, Optional
 from pinecone import Pinecone
 from src.utils import retry_with_backoff
 from src.database import db
-# from dotenv import load_dotenv
 import src.config as config
-# load_dotenv()
 
 class VectorSearchService:
     """
