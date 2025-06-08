@@ -67,7 +67,7 @@ export function UnsignedFooter() {
         <div className="mb-4 md:mb-0">
           <span className="text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#3b82f6] to-blue-300 tracking-tight">Converse-Aid</span>
           <p className="text-xs text-gray-400 mt-1 max-w-xs">
-            Converse-Aid is a conversational AI platform for any industry. Create AI Agents ("Jobs") to automate and personalize your communication via email.
+            Converse-Aid is a conversational AI platform for any industry. Create AI Agents (&quot;Jobs&quot;) to automate and personalize your communication via email.
           </p>
         </div>
         <div className="flex space-x-6">

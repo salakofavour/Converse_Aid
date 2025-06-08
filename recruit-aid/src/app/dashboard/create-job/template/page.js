@@ -262,7 +262,7 @@ export default function JobTemplate() {
                   onChange={handleChange}
                   required
                 />
-                <p className="text-xs text-gray-500 mt-1">The interval between the agent's replies</p>
+                <p className="text-xs text-gray-500 mt-1">The interval between the agent&apos;s replies</p>
               </div>
             </div>
           </div>

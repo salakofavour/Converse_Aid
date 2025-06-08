@@ -22,7 +22,7 @@ export default function About() {
                   <h3 className="font-medium text-gray-900">University Teaching Assistants</h3>
                   <p className="text-gray-600">
                     Students can be listed as members & the curriculum & other semester details inputted as the knowledgebase. 
-                    The agent addresses members' queries completely from the knowledgebase, reducing the questions professors & teaching assistants would have to address, allowing them to focus on other tasks.
+                    The agent addresses member&apos;s queries completely from the knowledgebase, reducing the questions professors & teaching assistants would have to address, allowing them to focus on other tasks.
                   </p>
                 </div>
               </li>

@@ -20,6 +20,8 @@
 # production
 /build
 
+# cursor files
+/.cursor/
 # misc
 .DS_Store
 *.pem

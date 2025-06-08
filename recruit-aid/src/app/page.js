@@ -39,15 +39,15 @@ export default function Home() {
           <h2 className="text-2xl font-bold text-center mb-8">What Our Users Say</h2>
           <div className="grid md:grid-cols-3 gap-8">
             <div className="bg-white rounded-lg shadow p-6 text-center">
-              <p className="text-gray-600 italic">"Converse-Aid gives us more control than any other platform we've tried!"</p>
+              <p className="text-gray-600 italic">&quot;Converse-Aid gives us more control than any other platform we&apos;ve tried!&quot;</p>
               <div className="mt-4 text-blue-500 font-semibold">- Placeholder User</div>
             </div>
             <div className="bg-white rounded-lg shadow p-6 text-center">
-              <p className="text-gray-600 italic">"The human-in-the-loop feature is a game changer for our support team."</p>
+              <p className="text-gray-600 italic">&quot;The human-in-the-loop feature is a game changer for our support team.&quot;</p>
               <div className="mt-4 text-blue-500 font-semibold">- Placeholder User</div>
             </div>
             <div className="bg-white rounded-lg shadow p-6 text-center">
-              <p className="text-gray-600 italic">"Seamless integration with Gmail makes our workflow effortless."</p>
+              <p className="text-gray-600 italic">&quot;Seamless integration with Gmail makes our workflow effortless.&quot;</p>
               <div className="mt-4 text-blue-500 font-semibold">- Placeholder User</div>
             </div>
           </div>

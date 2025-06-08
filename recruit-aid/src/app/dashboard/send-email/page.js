@@ -15,7 +15,7 @@ export default function SendEmail() {
       {/* Tabs and Content Section */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
         <h2 className="text-2xl text-center font-semibold mb-4">Send Email</h2>
-        <h4 className="text-xl text-center font-semibold mb-4">use '{{recipient_Name}}' when you want to address multiple recipients by name in a message</h4>
+        <h4 className="text-xl text-center font-semibold mb-4">use &apos;{{recipient_Name}}&apos; when you want to address multiple recipients by name in a message</h4>
         {/* Tabs */}
         <div className="flex justify-center border-b border-gray-200 mb-6">
           <div className="text-center px-8 py-2">

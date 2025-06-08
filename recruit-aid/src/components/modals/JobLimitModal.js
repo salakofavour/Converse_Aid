@@ -23,7 +23,7 @@ export function JobLimitModal({ isOpen, onClose }) {
       
       <Modal.Body>
         <p className="text-gray-600 mb-4">
-          You've reached the limit of 5 jobs on the free plan. 
+          You&apos;ve reached the limit of 5 jobs on the free plan. 
           Upgrade to Pro to create unlimited jobs and access premium features.
         </p>
 
