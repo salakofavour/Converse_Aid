@@ -35,14 +35,6 @@ function normalizeWhitespace(text) {
   return text.replace(/\s+/g, ' ').trim();
 }
 
-// Function to determine number of clusters based on text length
-function getDynamicClusterCount(sentences) {
-  // Aim for roughly 200 words per cluster (assuming average 15 words per sentence) & 6 sentences per cluster
-  const estimatedClusters = Math.ceil(sentences.length / 6);
-  // Keep clusters between 2 and 15
-  return Math.max(2, Math.min(15, estimatedClusters));
-}
-
 // Function to split input text into semantic chunks
 async function breakText(content) {
   if (!content) {
@@ -73,56 +65,6 @@ async function breakText(content) {
   }));
 }
 
-// Simple k-means implementation
-async function kmeans(points, k, maxIterations = 10) {
-  const dimensions = points[0].length;
-  
-  // Initialize centroids randomly
-  let centroids = Array(k).fill().map(() => 
-    Array(dimensions).fill().map(() => Math.random())
-  );
-  
-  let labels = new Array(points.length);
-  let iterations = 0;
-  let oldLabels;
-
-  do {
-    oldLabels = [...labels];
-    
-    // Assign points to nearest centroid
-    labels = points.map(point => {
-      const distances = centroids.map(centroid => 
-        euclideanDistance(point, centroid)
-      );
-      return distances.indexOf(Math.min(...distances));
-    });
-    
-    // Update centroids
-    for (let i = 0; i < k; i++) {
-      const clusterPoints = points.filter((_, idx) => labels[idx] === i);
-      if (clusterPoints.length > 0) {
-        centroids[i] = clusterPoints.reduce((acc, point) => 
-          acc.map((val, idx) => val + point[idx])
-        ).map(sum => sum / clusterPoints.length);
-      }
-    }
-    
-    iterations++;
-  } while (iterations < maxIterations && !arraysEqual(labels, oldLabels));
-
-  return labels;
-}
-
-function euclideanDistance(a, b) {
-  return Math.sqrt(
-    a.reduce((sum, val, i) => sum + Math.pow(val - b[i], 2), 0)
-  );
-}
-
-function arraysEqual(a, b) {
-  return a.length === b.length && 
-    a.every((val, idx) => val === b[idx]);
-}
 
 // Function to create pinecone index, connect to it, and upload input chunks as vectors
 export async function uploadVectors(job_details) {

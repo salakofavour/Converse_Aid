@@ -57,7 +57,7 @@ export async function deleteAccount(userId) {
     if (subscription) {
       try {
         if (subscription.stripe_subscription_id) {
-          await stripe.subscriptions.delete(subscription.stripe_subscription_id);
+          await stripe.subscriptions.cancel(subscription.stripe_subscription_id);
         }
         if (subscription.stripe_customer_id) {
           await stripe.customers.delete(subscription.stripe_customer_id);

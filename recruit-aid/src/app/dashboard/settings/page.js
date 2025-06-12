@@ -880,8 +880,14 @@ export default function Settings() {
                   </h3>
                   <div className="mt-2">
                     <p className="text-sm text-gray-500">
-                      Are you sure you want to delete your account? This action cannot be undone. Please enter your email address to confirm.
+                      Are you sure you want to delete your account? This action cannot be undone. Please enter your email address to confirm. If you confirm the following will happen:
                     </p>
+                    <ul className="list-disc list-inside">
+                      <li>Your account will be disabled and permanently deleted.</li>
+                      <li>You will no longer have access to any saved knowledgebase, members list, jobs, or any other information in your account. Access will be completely discontinued.</li>
+                      <li>You will be logged out.</li>
+                      <li>You will be able to sign up for a new Converse-Aid account if you choose.</li>
+                    </ul>
                   </div>
                 </div>
               </div>

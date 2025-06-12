@@ -111,15 +111,16 @@ class EmailAutomationApp:
             # print("email_body: ", email_body)
             receiver = f"Hi {member['name_email']['name']},"
             last_message = email_body.split(receiver)[0]
+            print("email_body: ", email_body)
+            print("last_message: ", last_message)
 
             email_context_prompt = PromptTemplate.from_template(
                 """Act as a helpful assistant.
 
                 Instructions:
-                - First understand the discussion flow of "conversation-thread".
-                - Then extract the context of "last_message"
+                - The "conversation-thread" is the memory of the discussion. Understand the discussion in "conversation-thread" and then extract the context of "last_message" as it relates to the discussion.
                 - if the extracted context is only a greeting or gratitude, create a sentence with the extracted context and return a friendly greeting or gratitude that always starts with "Thank you"and ask how you can help as needed.
-                - else if the extracted context is not a greeting or gratitude, return a sentence that is made with the extracted context, keeping in mind the discussion flow to match the tone and flow of the conversation, not for factual content.
+                - else if the extracted context is not a greeting or gratitude, return a sentence that is made with the extracted context.
                 - Note that the sentence will be used in a semantic search
                 "conversation-thread": {email_history}\n
                 "last_message": {last_message}
