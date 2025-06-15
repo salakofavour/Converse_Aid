@@ -44,14 +44,6 @@ export async function GET() {
 // POST /api/profile
 export async function POST(request) {
   try {
-    const { name, company, role, phone, timezone } = await request.json();
-
-    if (!name) {
-      return NextResponse.json(
-        { error: 'Name is required' },
-        { status: 400 }
-      );
-    }
 
     const supabase = await createSupabaseServerClient();
 
@@ -65,18 +57,13 @@ export async function POST(request) {
       );
     }
 
-    // Create the profile
+    // Create the profile with the id & email to have a row, this happens at signup,then we can add the other fields later
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .insert([
         {
           id: user.id,
-          name,
-          company,
           email: user.email,
-          role,
-          phone,
-          timezone
         }
       ])
       .select()

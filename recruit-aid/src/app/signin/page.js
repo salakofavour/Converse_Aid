@@ -28,12 +28,19 @@ export default function SignIn() {
       
       if (!response.ok) {
         throw new Error(data.error || 'An error occurred during sign in.');
+      }else{
+        const response = await fetchWithCSRF('/api/profile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        setMessage({
+          type: 'success',
+          text: 'Check your email for the magic link to sign in!'
+        });
       }
-      
-      setMessage({
-        type: 'success',
-        text: 'Check your email for the magic link to sign in!'
-      });
+
     } catch (error) {
       setMessage({
         type: 'error',

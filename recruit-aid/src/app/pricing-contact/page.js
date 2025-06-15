@@ -152,15 +152,15 @@ export default function PricingContact() {
         <div className="grid md:grid-cols-3 gap-8 mb-8">
           <div className="bg-white rounded-lg shadow p-6 flex flex-col items-center border-t-4 border-blue-500 transform transition-all hover:scale-105">
             <h2 className="text-lg font-semibold mb-2 text-blue-500">Sales</h2>
-            <p className="text-gray-600 mb-2">support@converse-aid.com</p>
+            <p className="text-gray-600 mb-2">support@example.com</p>
           </div>
           <div className="bg-white rounded-lg shadow p-6 flex flex-col items-center border-t-4 border-blue-500 transform transition-all hover:scale-105">
             <h2 className="text-lg font-semibold mb-2 text-blue-500">General Inquiries</h2>
-            <p className="text-gray-600 mb-2">info@converse-aid.com</p>
+            <p className="text-gray-600 mb-2">info@example.com</p>
           </div>
           <div className="bg-white rounded-lg shadow p-6 flex flex-col items-center border-t-4 border-blue-500 transform transition-all hover:scale-105">
             <h2 className="text-lg font-semibold mb-2 text-blue-500">Phone</h2>
-            <p className="text-gray-600 mb-2">+1 (863) 337-9535</p>
+            <p className="text-gray-600 mb-2">+1 (000) 000-0000</p>
           </div>
         </div>
         <div className="text-center text-gray-500">We promise to reach back within 24 hours.</div>

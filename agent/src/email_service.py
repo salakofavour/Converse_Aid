@@ -370,10 +370,6 @@ class EmailService:
                 }
             
             
-            # Update email details in member record ->  this is just to supply the body of the members response 
-            # to the vector search, it annoys me a bit i need to call a db operation just for one variable
-            #but that is how needed it is for now. I wont update the body after a reply, as that is not needed
-            # I only need the body from an members reply
             email_details = {
                 "body": message_data["body"]
             }
@@ -389,8 +385,7 @@ class EmailService:
         except Exception as e:
             raise
 
-    #implementation to send user a notification email I cannot use the email from here to send important/error email. like the refresh_token error, if that is wrong the email sending will also be wrong so wont send
-    #of course i can, the refresh_token and all that is when i want to use the user's email to perform actions. In this I am using the business's email to send emails
+
     @retry_with_backoff() 
     def send_user_notification_email(self, message: str, member_id: str="", job_id: str="", isJob: bool=False) -> Dict[str, Any]:
         """

@@ -128,7 +128,7 @@ class EmailAutomationApp:
             )
             email_context = llm.invoke(email_context_prompt.invoke({"email_history": email_body, "last_message": last_message}))
 
-            #if email_context is a salutation return response = email_context.content else proceed with the below
+            #if email_context is a salutation return response
             if email_context.content.startswith("Thank you"):
                 response = email_context.content
             else:
@@ -332,7 +332,7 @@ class EmailAutomationApp:
         try:
             # The first step will be to check if the job_id exists in the db, if it does not, return a message saying the job does not exist & delete the schedule
             job = db.get_job_details(self.job_id)
-            #I am not combining the similar logic of util.delete_schedulr below because if job is not found, user will still try to check first & that will result in error
+            #I am not combining the similar logic of util.delete_scheduler below because if job is not found, user will still try to check first & that will result in error
 
             if not job or job["status"].lower() == "closed":
                 util.delete_schedule(self.job_id)
