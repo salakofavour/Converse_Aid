@@ -36,6 +36,7 @@ export default function Dashboard() {
         if (!profileResponse.ok) {
           // in this case, this happens because no profile information for this user is available(this is not taking into account network issues).
           // so we need to initialize basic profile info for this user
+          
           const response = await fetchWithCSRF('/api/profile', {
             method: 'POST',
             headers: {

@@ -76,7 +76,7 @@ export async function POST(request) {
         { status: 500 }
       );
     }
-
+    console.log("profile initialized, backend: ", profile);
     return NextResponse.json({ profile });
   } catch (error) {
     console.error('Error in profile POST route:', error);
