@@ -24,7 +24,7 @@ export default function Settings() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isNewProfile, setIsNewProfile] = useState(false);
+  // const [isNewProfile, setIsNewProfile] = useState(false);
   const [isProcessingOAuth, setIsProcessingOAuth] = useState(false);
   const [showEmailChangeModal, setShowEmailChangeModal] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
@@ -45,7 +45,14 @@ export default function Settings() {
         // Get profile data
         const response = await fetchWithCSRF('/api/profile');
         if (!response.ok) {
-          throw new Error('Failed to fetch profile data');
+          // throw new Error('Failed to fetch profile data');
+          // in this case, this happens because no profile information for this user is available(this is not taking into account network issues).
+          const response = await fetchWithCSRF('/api/profile', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
         }
         const { profile } = await response.json();
         console.log('Loaded profile data:', { 
@@ -53,7 +60,7 @@ export default function Settings() {
           senderEmails: profile?.sender || []
         });
         // Set isNewProfile based on whether profile exists
-        setIsNewProfile(!profile);
+        // setIsNewProfile(!profile);
         
         // Set profile data
         setProfileData({
@@ -266,7 +273,7 @@ export default function Settings() {
       }
       // console.log("profileData", profileData);
       const response = await fetchWithCSRF('/api/profile', {
-        method: isNewProfile ? 'POST' : 'PUT',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -290,7 +297,7 @@ export default function Settings() {
         timezone: profile.timezone || 'America/New_York'
       });
 
-      setIsNewProfile(false);
+      // setIsNewProfile(false);
       toast.success('Profile updated successfully');
     } catch (err) {
       console.error('Error saving profile:', err);
