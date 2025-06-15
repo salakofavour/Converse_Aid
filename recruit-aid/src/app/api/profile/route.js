@@ -23,23 +23,39 @@ export async function GET() {
       .eq('id', user.id)
       .single();
 
-    if (profileError && profileError.code !== 'PGRST116') {
+    if (profileError){
+      if (profileError.code === 'PGRST116') {
+        console.log("profile not found, initializing new profile");
+        // Create the profile with the id & email to have a row, this happens at signup,then we can add the other fields later
+        const { data: newProfile, error: newProfileError } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: user.id,
+            email: user.email,
+          }
+        ])
+        .select()
+        .single();
+      }
+      else{
+        console.error('Error fetching profile:', profileError);
+        return NextResponse.json(
+          { error: 'Failed to fetch profile' },
+          { status: 500 }
+        );
+      }
+    }
+
+    return NextResponse.json({ profile });
+  } catch (error) {
       console.error('Error fetching profile:', profileError);
       return NextResponse.json(
         { error: 'Failed to fetch profile' },
         { status: 500 }
       );
     }
-
-    return NextResponse.json({ profile });
-  } catch (error) {
-    console.error('Error in profile GET route:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
   }
-}
 
 // POST /api/profile
 export async function POST(request) {

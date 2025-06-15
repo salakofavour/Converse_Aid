@@ -45,14 +45,14 @@ export default function Settings() {
         // Get profile data
         const response = await fetchWithCSRF('/api/profile');
         if (!response.ok) {
-          // throw new Error('Failed to fetch profile data');
+          throw new Error('Failed to fetch profile data');
           // in this case, this happens because no profile information for this user is available(this is not taking into account network issues).
-          const response = await fetchWithCSRF('/api/profile', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          });
+          // const response = await fetchWithCSRF('/api/profile', {
+          //   method: 'POST',
+          //   headers: {
+          //     'Content-Type': 'application/json',
+          //   },
+          // });
         }
         const { profile } = await response.json();
         console.log('Loaded profile data:', { 
