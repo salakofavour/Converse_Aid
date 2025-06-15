@@ -35,15 +35,14 @@ export default function Dashboard() {
         const profileResponse = await fetchWithCSRF('/api/profile');
         if (!profileResponse.ok) {
           // in this case, this happens because no profile information for this user is available(this is not taking into account network issues).
-          // so we need to initialize basic profile info for this user
-          
+          // so we need to initialize basic profile info for this user. There is no error but the profile is not initializing here. will need to save profile from settings before adding sender to array.
+
           const response = await fetchWithCSRF('/api/profile', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
           });
-          console.log("initialize profile: ", response);
           // throw new Error('Failed to fetch profile data');
         }
         const profileData = await profileResponse.json();
