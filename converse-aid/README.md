@@ -1,12 +1,12 @@
 # Converse-Aid
 
-A modern recruitment management platform built with Next.js, Supabase, Bootstrap, and shadcn/ui.
+An AI platform used to create conversation agents.
 
 ## Features
 
 - **User Authentication**: Secure magic link authentication with Supabase
-- **Dashboard**: Overview of recruitment activities and key metrics
-- **Job Management**: Create and manage job postings
+- **Dashboard**: Overview of active & total jobs(agents) recruitment activities and key metrics
+- **Job Management**: Create and manage jobs
 - **Responsive Design**: Works seamlessly on desktop and mobile devices
 - **Modern UI**: Clean, professional interface with light blue and white color scheme
 
@@ -43,13 +43,41 @@ A modern recruitment management platform built with Next.js, Supabase, Bootstrap
 
 3. Set up environment variables:
    - Create a `.env.local` file in the root directory
-   - Add your Supabase credentials:
-     ```
-     NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-     NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-     ```
-   - Add your Pinecone API key to the `.env` file
-      NEXT_PINECONE_API_KEY=your_pinecone_api_key_here 
+      # Supabase 
+      NEXT_PUBLIC_SUPABASE_URL
+      NEXT_PUBLIC_SUPABASE_ANON_KEY
+      NEXT_SUPABASE_SERVICE_ROLE_KEY
+
+
+      # Google OAuth
+      GOOGLE_CLIENT_ID
+      GOOGLE_CLIENT_SECRET
+      GOOGLE_REDIRECT_URI
+
+      #GMAIL SCOPE
+      GOOGLE_GMAIL_SCOPES
+
+      # Pinecone
+      NEXT_PINECONE_API_KEY
+      NEXT_PINECONE_INDEX_NAME
+
+      # Stripe test keys
+      NEXT_PUBLIC_STRIPE_SECRET_KEY
+      STRIPE_PRICE_ID
+      STRIPE_WEBHOOK_SECRET
+
+      # General
+      PUBLIC_APP_URL=http://localhost:3000
+
+      # Resend
+      NEXT_RESEND_API_KEY
+      NEXT_FROM_EMAIL=senderemail@example.com
+
+      # AWS Endpoint & API_KEY
+      AGENT_CREATE_SCHEDULE
+      AGENT_DELETE_SCHEDULE
+      AGENT_API_KEY
+
 
 4. Run the development server:
    ```bash
